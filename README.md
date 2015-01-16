@@ -34,30 +34,30 @@ Left (Unit "c")
 See `Descriptive.Form`.
 
 ``` haskell
-λ> describeMap ((,) <$> input "username" <*> input "password")
-And (Unit (Input "username")) (Unit (Input "password"))
+λ> describe ((,) <$> input "username" <*> input "password") mempty
+(And (Unit (Input "username")) (Unit (Input "password")),fromList [])
 
-λ> describeMap (validate "confirmed password (entered the same twice)"
-                         (\(x,y) -> return (if x == y then Just y else Nothing))
-                         ((,) <$> input "password" <*> input "password2"))
-Wrap (Constraint "confirmed password (entered the same twice)")
-     (And (Unit (Input "password")) (Unit (Input "password2")))
+λ> consume ((,) <$>
+            input "username" <*>
+            input "password")
+           (M.fromList [("username","chrisdone"),("password","god")])
+(Right ("chrisdone","god")
+,fromList [("password","god"),("username","chrisdone")])
 
-λ> parseMap (M.fromList [("username","chrisdone"),("password","god")])
-            ((,) <$> input "username" <*> input "password")
-Right ("chrisdone","god")
+λ> describe (validate "confirmed password (entered the same twice)"
+                      (\(x,y) ->
+                         if x == y
+                            then Just y
+                            else Nothing)
+                      ((,) <$>
+                       input "password" <*>
+                       input "password2"))
+            mempty
+(Wrap (Constraint "confirmed password (entered the same twice)")
+      (And (Unit (Input "password"))
+           (Unit (Input "password2")))
+,fromList [])
 
-λ> parseMap (M.fromList [("password2","gob"),("password","god")])
-            (validate "confirmed password (entered the same twice)"
-                      (\(x,y) -> return (if x == y then Just y else Nothing))
-                      ((,) <$> input "password" <*> input "password2"))
-Left (Unit (Constraint "confirmed password (entered the same twice)"))
-
-λ> parseMap (M.fromList [("password2","god"),("password","god")])
-            (validate "confirmed password (entered the same twice)"
-                      (\(x,y) -> return (if x == y then Just y else Nothing))
-                      ((,) <$> input "password" <*> input "password2"))
-Right "god"
 ```
 
 ## Validating forms with auto-generated input indexes
@@ -65,12 +65,21 @@ Right "god"
 See `Descriptive.Formlet`.
 
 ``` haskell
-λ> describeFormlet ((,) <$> indexed <*> indexed)
-And (Unit (Index 0)) (Unit (Index 1))
-λ> parseFormlet (M.fromList [(0,"chrisdone"),(1,"god")]) ((,) <$> indexed <*> indexed)
-Right ("chrisdone","god")
-λ> parseFormlet (M.fromList [(0,"chrisdone")]) ((,) <$> indexed <*> indexed)
-Left (Unit (Index 2))
+λ> describe ((,) <$> indexed <*> indexed) (FormletState mempty 0)
+(And (Unit (Index 0))
+     (Unit (Index 1))
+,FormletState {formletMap = fromList []
+              ,formletIndex = 2})
+λ> consume ((,) <$> indexed <*> indexed) (FormletState (M.fromList [(0,"chrisdone"),(1,"god")]) 0)
+(Right ("chrisdone","god")
+,FormletState {formletMap =
+                 fromList [(0,"chrisdone"),(1,"god")]
+              ,formletIndex = 2})
+λ> consume ((,) <$> indexed <*> indexed) (FormletState (M.fromList [(0,"chrisdone")]) 0)
+(Left (Unit (Index 1))
+,FormletState {formletMap =
+                 fromList [(0,"chrisdone")]
+              ,formletIndex = 2})
 ```
 
 ## Parsing command-line options
