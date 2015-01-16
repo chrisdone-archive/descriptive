@@ -76,36 +76,3 @@ integer doc =
                 Error{} -> (Left d,s)
                 Success a -> (Right a,s))
   where d = Unit (Integer doc)
-
--- | Submit a URL to reddit.
-data Submission =
-  Submission {submissionToken :: !Integer
-             ,submissionTitle :: !Text
-             ,submissionComment :: !Text
-             ,submissionSubreddit :: !Integer}
-  deriving (Show)
-
-submission :: Consumer Value Doc Submission
-submission =
-  obj "Submission"
-      (Submission
-        <$> key "token" (integer "Submission token; see the API docs")
-        <*> key "title" (string "Submission title")
-        <*> key "comment" (string "Submission comment")
-        <*> key "subreddit" (integer "The ID of the subreddit"))
-
-sample :: Value
-sample =
-  toJSON (object
-            ["token" .= 123
-            ,"title" .= "Some title"
-            ,"comment" .= "This is good"
-            ,"subreddit" .= 234214])
-
-badsample :: Value
-badsample =
-  toJSON (object
-            ["token" .= 123
-            ,"title" .= "Some title"
-            ,"comment" .= 123
-            ,"subreddit" .= 234214])
