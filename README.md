@@ -137,3 +137,11 @@ Wrap (Object "Submission")
           (Wrap (Key "subreddit")
                 (Unit (Integer "The ID of the subreddit"))))
 ```
+
+## Parsing Attempto Controlled English for MUD commands
+
+TBA.
+
+## Producing questions and consuming the answers in Haskell
+
+TBA. Will be a generalization of [this type](https://github.com/chrisdone/exercise/blob/master/src/Exercise/Types.hs#L20).
