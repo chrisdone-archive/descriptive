@@ -41,6 +41,25 @@ consume :: Consumer s d a -> s -> (Either (Description d) a,s)
 describe :: Consumer s d a -> s -> (Description d,s)
 ```
 
+A description is like this:
+
+``` haskell
+data Description a
+  = Unit !a
+  | Bounded !Integer !Bound !(Description a)
+  | And !(Description a) !(Description a)
+  | Sequence [Description a]
+  | Wrap a (Description a)
+  | None
+  deriving (Show)
+```
+
+You configure the `a` for your use-case, but the rest is generatable
+by the library. Afterwards, you can make your own pretty printing
+function, which may be to generate an HTML form, to generate a
+commandline `--help` screen, a man page, API docs for your JSON
+parser, a text parsing grammar, etc.
+
 See below for some examples.
 
 ## Parsing characters
