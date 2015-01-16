@@ -81,6 +81,8 @@ See `Descriptive.Char`.
 (Right "kkkabc","")
 λ> consume (zeroOrMore (char 'k') <> string "abc") "kkkab"
 (Left (Unit "a character"),"")
+λ> consume (zeroOrMore (char 'k') <> string "abc") "kkkabj"
+(Left (Unit "c"),"")
 ```
 
 ## Validating forms with named inputs
