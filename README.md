@@ -273,7 +273,7 @@ Right (ComplVDisV (DistransitiveV "<distrans-verb>")
 Which I can then further parse with `descriptive` to yield
 descriptions like:
 
-> <verb-phrase> [<noun-phrase> ..]
+    <verb-phrase> [<noun-phrase> ..]
 
 Or similar. Which would be handy for a MUD so that a user can write:
 
