@@ -19,14 +19,16 @@ See below for some examples.
 See `Descriptive.Char`.
 
 ``` haskell
-λ> describeList (many (char 'k') <> string "abc")
-And (Bounded 0 UnlimitedBound (Unit "k")) (Sequence [Unit "a",Unit "b",Unit "c"])
-
-λ> parseList "kkkabc" (many (char 'k') <> string "abc")
-Right "kkkabc"
-
-λ> parseList "kkkabq" (many (char 'k') <> string "abc")
-Left (Unit "c")
+λ> describe (zeroOrMore (char 'k') <> string "abc") mempty
+(And (Bounded 0 UnlimitedBound (Unit "k"))
+     (And (Unit "a")
+          (And (Unit "b")
+               (And (Unit "c") None)))
+,"")
+λ> consume (zeroOrMore (char 'k') <> string "abc") "kkkabc"
+(Right "kkkabc","")
+λ> consume (zeroOrMore (char 'k') <> string "abc") "kkkab"
+(Left (Unit "a character"),"")
 ```
 
 ## Validating forms with named inputs
