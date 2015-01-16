@@ -9,13 +9,11 @@
 
 module Descriptive.JSON where
 
+import Data.Bifunctor
 import Data.Monoid
 import Descriptive
 
-import Control.Arrow
 import Control.Applicative
-import Control.Monad.State.Class
-import Control.Monad.State.Strict
 import Data.Aeson
 import Data.Aeson.Types
 import Data.Text (Text)
@@ -30,17 +28,17 @@ data Doc
 
 -- | Consume an object.
 obj :: Text -> Consumer Object Doc a -> Consumer Value Doc a
-obj help =
+obj desc =
   wrap (\v d -> (Wrap doc (fst (d mempty)),v))
        (\v _ p ->
           case fromJSON v of
             Error{} -> (Left (Unit doc),v)
             Success o ->
               (case p o of
-                 (Left e,o') -> Left e
-                 (Right a,o') -> Right a
+                 (Left e,_) -> Left (Wrap doc e)
+                 (Right a,_) -> Right a
               ,toJSON o))
-  where doc = Struct help
+  where doc = Struct desc
 
 -- | Consume from object at the given key.
 key :: Text -> Consumer Value Doc a -> Consumer Object Doc a
@@ -49,13 +47,14 @@ key k =
           first (Wrap doc)
                 (second (const o)
                         (d (toJSON o))))
-       (\o d p ->
+       (\o _ p ->
           case parseMaybe (const (o .: k))
                           () of
             Nothing -> (Left (Unit doc),o)
             Just (v :: Value) ->
-              second (const o)
-                     (p v))
+              first (bimap (Wrap doc) id)
+                    (second (const o)
+                            (p v)))
   where doc = Key k
 
 -- | Consume a string.
@@ -77,3 +76,36 @@ integer doc =
                 Error{} -> (Left d,s)
                 Success a -> (Right a,s))
   where d = Unit (Integer doc)
+
+-- | Submit a URL to reddit.
+data Submission =
+  Submission {submissionToken :: !Integer
+             ,submissionTitle :: !Text
+             ,submissionComment :: !Text
+             ,submissionSubreddit :: !Integer}
+  deriving (Show)
+
+submission :: Consumer Value Doc Submission
+submission =
+  obj "Submission"
+      (Submission
+        <$> key "token" (integer "Submission token; see the API docs")
+        <*> key "title" (string "Submission title")
+        <*> key "comment" (string "Submission comment")
+        <*> key "subreddit" (integer "The ID of the subreddit"))
+
+sample :: Value
+sample =
+  toJSON (object
+            ["token" .= 123
+            ,"title" .= "Some title"
+            ,"comment" .= "This is good"
+            ,"subreddit" .= 234214])
+
+badsample :: Value
+badsample =
+  toJSON (object
+            ["token" .= 123
+            ,"title" .= "Some title"
+            ,"comment" .= 123
+            ,"subreddit" .= 234214])

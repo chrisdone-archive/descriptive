@@ -185,15 +185,21 @@ badsample =
                   ,("comment",String "This is good")]))
 
 λ> consume submission badsample
-(Left (Unit (Text "Submission comment"))
+(Left (Wrap (Struct "Submission")
+            (Wrap (Key "comment")
+                  (Unit (Text "Submission comment"))))
 ,Object (fromList [("token",Number 123.0)
                   ,("subreddit",Number 234214.0)
                   ,("title",String "Some title")
                   ,("comment",Number 123.0)]))
 ```
 
-The bad sample yields an informative message that the submission
-comment should be a string.
+The bad sample yields an informative message that:
+
+* The error is in the Submission object.
+* The key "comment".
+* The type of that key should be a String and it should be a
+  Submission comment (or whatever invariants you'd like to mention).
 
 ## Parsing Attempto Controlled English for MUD commands
 

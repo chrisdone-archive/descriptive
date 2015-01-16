@@ -21,4 +21,4 @@ library
                      Descriptive.Options
                      Descriptive.JSON
   build-depends:     base >= 4 && <5,
-                     transformers, containers, text, mtl, aeson
+                     transformers, containers, text, mtl, aeson, bifunctors
