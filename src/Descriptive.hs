@@ -125,8 +125,17 @@ zeroOrMore =
 
 -- | Compose contiguous items into one sequence.
 sequencing :: [Consumer d s a] -> Consumer d s [a]
-sequencing (x:xs) = (:) <$> x <*> sequencing xs
-sequencing [] = mempty
+sequencing =
+  wrap (\s d ->
+          first (Sequence . se)
+                (d s))
+       (\s d p -> p s) .
+  go
+  where se (And x y) = x : se y
+        se None = []
+        se x = [x]
+        go (x:xs) = (:) <$> x <*> sequencing xs
+        go [] = mempty
 
 --------------------------------------------------------------------------------
 -- Running

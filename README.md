@@ -21,9 +21,7 @@ See `Descriptive.Char`.
 ``` haskell
 λ> describe (zeroOrMore (char 'k') <> string "abc") mempty
 (And (Bounded 0 UnlimitedBound (Unit "k"))
-     (And (Unit "a")
-          (And (Unit "b")
-               (And (Unit "c") None)))
+     (Sequence [Unit "a",Sequence [Unit "b",Sequence [Unit "c",Sequence []]]])
 ,"")
 λ> consume (zeroOrMore (char 'k') <> string "abc") "kkkabc"
 (Right "kkkabc","")
