@@ -12,6 +12,33 @@ through a common interface: self-describing parsers:
 * A MUD command set is a self-describing parser.
 * A JSON API can be a self-describing parser.
 
+Consumption is done in this data type:
+
+``` haskell
+data Consumer s d a
+```
+
+To make a consumer, this combinator is used:
+
+``` haskell
+consumer :: (s -> (Description d,s))
+         -> (s -> (Either (Description d) a,s))
+         -> Consumer s d a
+```
+
+The first argument generates a description based on some state. The
+state is determined by whatever use-case you have. The second argument
+parses from the state, which could be a stream of bytes, a list of
+strings, a Map, a Vector, etc. You may or may not decide to modify the
+state during generation of the description and during parsing.
+
+To use a consumer or describe what it does, these are used:
+
+``` haskell
+consume :: Consumer s d a -> s -> (Either (Description d) a,s)
+describe :: Consumer s d a -> s -> (Description d,s)
+```
+
 See below for some examples.
 
 ## Parsing characters
