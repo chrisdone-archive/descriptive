@@ -58,9 +58,15 @@ You configure the `a` for your use-case, but the rest is generatable
 by the library. Afterwards, you can make your own pretty printing
 function, which may be to generate an HTML form, to generate a
 commandline `--help` screen, a man page, API docs for your JSON
-parser, a text parsing grammar, etc.
+parser, a text parsing grammar, etc. For example:
 
-See below for some examples.
+``` haskell
+describeParser :: Consumer [Char] Text Demo -> Text
+describeForm :: Consumer (Map Text Text) (Html ()) Login -> Html ()
+describeArgs :: Consumer [Text] CmdArgs MyApp -> CmdArgs
+```
+
+See below for some examples of this library.
 
 ## Parsing characters
 
