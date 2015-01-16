@@ -1,34 +1,12 @@
+{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE FlexibleContexts #-}
 
 -- | Command-line options parser.
---
--- Examples:
---
--- λ> describeList
---      ((,,,) <$>
---       constant "start" <*>
---       anyString "SERVER_NAME" <*>
---       flag "dev" "Enable dev mode?" <*>
---       arg "port" "Port to listen on")
---    And (And (And (Unit (Constant "start"))
---                  (Unit (AnyString "SERVER_NAME")))
---             (Unit (Flag "dev" "Enable dev mode?")))
---        (Unit (Arg "port" "Port to listen on"))
---
--- λ> parseList ["start","any","--port","1234","-fdev"]
---              ((,,,) <$>
---               constant "start" <*>
---               anyString "Server name" <*>
---               flag "dev" "Enable dev mode?" <*>
---               arg "port" "Port to listen on")
---    Right ("start","any",True,"1234")
 
 module Descriptive.Options where
 
 import Descriptive
-
-import Control.Monad.State.Class
 import Data.List
 import Data.Monoid
 import Data.Text (Text)
@@ -41,48 +19,46 @@ data Option
   deriving (Show)
 
 -- | Consume one argument from the argument list.
-anyString :: MonadState [Text] m
-          => Text -> Consumer Option m Text
+anyString :: Text -> Consumer [Text] Option Text
 anyString help =
-  consume (return (Unit (AnyString help)))
-          (\args ->
-             case args of
-               [] -> return Nothing
-               (x:xs) ->
-                 do put xs
-                    return (Just x))
+  consumer (d,)
+           (\s ->
+              case s of
+                [] -> (Left d,s)
+                (x:s') -> (Right x,s'))
+  where d = Unit (AnyString help)
 
 -- | Consume one argument from the argument list.
-constant :: MonadState [Text] m
-         => Text -> Consumer Option m Text
+constant :: Text -> Consumer [Text] Option Text
 constant x' =
-  consume (return (Unit (Constant x')))
-          (\args ->
-             case args of
-               (x:xs) | x == x' ->
-                 do put xs
-                    return (Just x)
-               _ -> return Nothing)
+  consumer (d,)
+           (\s ->
+              case s of
+                (x:s') | x == x' ->
+                  (Right x,s')
+                _ -> (Left d,s))
+  where d = Unit (Constant x')
 
 -- | Consume a short boolean flag.
-flag :: MonadState [Text] m
-     => Text -> Text -> Consumer Option m Bool
+flag :: Text -> Text -> Consumer [Text] Option Bool
 flag name help =
-  consume (return (Unit (Flag name help)))
-          (\args ->
-             return (Just (elem ("-f" <> name) args)))
+  consumer (d,)
+           (\s ->
+              (Right (elem ("-f" <> name) s),s))
+  where d = Unit (Flag name help)
 
 -- | Consume a named argument.
-arg :: MonadState [Text] m
-    => Text -> Text -> Consumer Option m Text
+arg :: Text -> Text -> Consumer [Text] Option Text
 arg name help =
-  consume (return (Unit (Arg name help)))
-          (\args ->
-             return (let indexedArgs = zip [0 :: Integer ..] args
-                     in case find ((== "--" <> name) . snd) indexedArgs of
-                          Nothing -> Nothing
-                          Just (i,_) ->
-                            case lookup (i + 1) indexedArgs of
-                              Nothing -> Nothing
-                              Just text ->
-                                Just text))
+  consumer (d,)
+           (\s ->
+              let indexedArgs =
+                    zip [0 :: Integer ..] s
+              in case find ((== "--" <> name) . snd) indexedArgs of
+                   Nothing -> (Left d,s)
+                   Just (i,_) ->
+                     case lookup (i + 1) indexedArgs of
+                       Nothing -> (Left d,s)
+                       Just text ->
+                         (Right text,s))
+  where d = Unit (Arg name help)

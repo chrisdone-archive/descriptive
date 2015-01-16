@@ -1,3 +1,4 @@
+{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE FlexibleContexts #-}
 
@@ -5,53 +6,49 @@
 --
 -- Examples:
 --
--- λ> describeList (many (char 'k') <> string "abc")
--- And (Bounded 0 UnlimitedBound (Unit "k")) (Sequence [Unit "a",Unit "b",Unit "c"])
+-- λ> describe (zeroOrMore (char 'k') <> string "abc") []
+-- (And (Bounded 0 UnlimitedBound (Unit "k")) (And (Unit "a") (And (Unit "b") (And (Unit "c") None))),"")
 --
--- λ> parseList "kkkabc" (many (char 'k') <> string "abc")
--- Right "kkkabc"
+-- λ> consumer (zeroOrMore (char 'k') <> string "abc") "kkkabc"
+-- (Right "kkkabc","")
 --
--- λ> parseList "kkkabq" (many (char 'k') <> string "abc")
--- Left (Unit "c")
+-- λ> consumer (zeroOrMore (char 'k') <> string "abc") "kkkabq"
+-- (Left (Unit "c"),"")
+--
+-- λ> consumer (zeroOrMore (char 'k') <> string "abc") "kkkab"
+-- (Left (Unit "a character"),"")
 
 module Descriptive.Char where
 
 import           Descriptive
 
-import           Control.Applicative
-import           Control.Monad.State.Strict
 import           Data.Text (Text)
 import qualified Data.Text as T
 
 -- | Consume any character.
-anyChar :: MonadState [Char] m
-        => Consumer Text m Char
+anyChar :: Consumer [Char] Text Char
 anyChar =
-  consume (return (Unit "a character"))
-          (\cs ->
-             case cs of
-               (c':cs') ->
-                 do put cs'
-                    return (Just c')
-               _ -> return Nothing)
+  consumer (d,)
+           (\s ->
+              case s of
+                (c':cs') -> (Right c',cs')
+                [] -> (Left d,s))
+  where d = Unit "a character"
 
 -- | A character consumer.
-char :: MonadState [Char] m
-     => Char -> Consumer Text m Char
+char :: Char -> Consumer [Char] Text Char
 char c =
-  wrap (const (return desc))
-       (\m ->
-          do r <- m
-             case r of
-               Left e -> return (Left e)
-               Right c'
-                 | c' == c -> return (Right c)
-                 | otherwise ->
-                   return (Left desc))
+  wrap (const .
+        (d,))
+       (\s _ p ->
+          case p s of
+            (Left e,s') -> (Left e,s')
+            (Right c',s')
+              | c' == c -> (Right c,s')
+              | otherwise -> (Left d,s'))
        anyChar
-  where desc = Unit (T.singleton c)
+  where d = Unit (T.singleton c)
 
 -- | A string consumer.
-string :: (MonadState [Char] m,Applicative m)
-       => [Char] -> Consumer Text m [Char]
-string = contiguous char
+string :: [Char] -> Consumer [Char] Text [Char]
+string = sequencing . map char

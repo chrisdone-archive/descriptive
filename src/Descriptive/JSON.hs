@@ -1,150 +1,79 @@
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ExtendedDefaultRules #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# OPTIONS_GHC -fno-warn-type-defaults #-}
 
 -- | A JSON API which describes itself.
---
--- Examples:
---
--- λ> parseAeson (integer "token") (toJSON 123)
--- Right 123
--- λ> parseAeson (integer "token") (toJSON "abc")
--- Left (Unit (Integer "token"))
--- λ>
---
--- submission :: Consumer Doc (State Value) Submission
--- submission =
---   obj "Submission"
---       (Submission
---         <$> key "token" (integer "Submission token; see the API docs")
---         <*> key "title" (text "Submission title")
---         <*> key "comment" (text "Submission comment")
---         <*> key "subreddit" (integer "The ID of the subreddit"))
---
--- sample :: Value
--- sample =
---   toJSON (object
---             ["token" .= 123
---             ,"title" .= "Some title"
---             ,"comment" .= "This is good"
---             ,"subreddit" .= 234214])
---
--- λ> parseAeson submission sample
--- Right (Submission {submissionToken = 123
---                   ,submissionTitle = "Some title"
---                   ,submissionComment = "This is good"
---                   ,submissionSubreddit = 234214})
--- λ> describeAeson submission
--- Wrap (Object "Submission")
---      (And (And (And (Wrap (Key "token")
---                           (Unit (Integer "Submission token; see the API docs")))
---                     (Wrap (Key "title")
---                           (Unit (Text "Submission title"))))
---                (Wrap (Key "comment")
---                      (Unit (Text "Submission comment"))))
---           (Wrap (Key "subreddit")
---                 (Unit (Integer "The ID of the subreddit"))))
-
 
 module Descriptive.JSON where
 
+import Data.Monoid
 import Descriptive
 
+import Control.Arrow
 import Control.Applicative
 import Control.Monad.State.Class
 import Control.Monad.State.Strict
-import Data.Aeson hiding (Object)
-import Data.Aeson.Types hiding (Object)
+import Data.Aeson
+import Data.Aeson.Types
 import Data.Text (Text)
-
--- | Submit a URL to reddit.
-data Submission =
-  Submission {submissionToken :: !Integer
-             ,submissionTitle :: !Text
-             ,submissionComment :: !Text
-             ,submissionSubreddit :: !Integer}
-  deriving (Show)
 
 -- | Description of parseable things.
 data Doc
   = Integer !Text
   | Text !Text
-  | Object !Text
+  | Struct !Text
   | Key !Text
   deriving (Show)
 
+-- | Consume an object.
+obj :: Text -> Consumer Object Doc a -> Consumer Value Doc a
+obj help =
+  wrap (\v d -> (Wrap doc (fst (d mempty)),v))
+       (\v _ p ->
+          case fromJSON v of
+            Error{} -> (Left (Unit doc),v)
+            Success o ->
+              (case p o of
+                 (Left e,o') -> Left e
+                 (Right a,o') -> Right a
+              ,toJSON o))
+  where doc = Struct help
+
 -- | Consume from object at the given key.
-key :: MonadState Value m
-    => Text -> Consumer Doc m a -> Consumer Doc m a
+key :: Text -> Consumer Value Doc a -> Consumer Object Doc a
 key k =
-  wrap (liftM (Wrap doc))
-       (local (\o' ->
-                 case parseMaybe
-                        (const (do o <- parseJSON o'
-                                   o .: k))
-                        () of
-                   Just value -> Right value
-                   Nothing -> Left (Unit doc)))
+  wrap (\o d ->
+          first (Wrap doc)
+                (second (const o)
+                        (d (toJSON o))))
+       (\o d p ->
+          case parseMaybe (const (o .: k))
+                          () of
+            Nothing -> (Left (Unit doc),o)
+            Just (v :: Value) ->
+              second (const o)
+                     (p v))
   where doc = Key k
 
--- | Consume an object.
-obj :: (MonadState Value m)
-    => Text -> Consumer Doc m a -> Consumer Doc m a
-obj doc = wrap (liftM (Wrap (Object doc))) id
+-- | Consume a string.
+string :: Text -> Consumer Value Doc Text
+string doc =
+  consumer (d,)
+           (\s ->
+              case fromJSON s of
+                Error{} -> (Left d,s)
+                Success a -> (Right a,s))
+  where d = Unit (Text doc)
 
 -- | Consume an integer.
-integer :: MonadState Value m
-        => Text -> Consumer Doc m Integer
+integer :: Text -> Consumer Value Doc Integer
 integer doc =
-  consume (return (Unit (Integer doc)))
-          (return . parseMaybe parseJSON)
-
--- | Consume an text.
-text :: MonadState Value m
-     => Text -> Consumer Doc m Text
-text doc =
-  consume (return (Unit (Text doc)))
-          (return . parseMaybe parseJSON)
-
--- | Use local state.
-local :: MonadState s m
-      => (s -> Either (Description d) s)
-      -> m (Either (Description d) a)
-      -> m (Either (Description d) a)
-local f m =
-  do orig <- get
-     case f orig of
-       Left e -> return (Left e)
-       Right p ->
-         do put p
-            v <- m
-            put orig
-            return v
-
--- | Parse a aeson of something.
-parseAeson :: Consumer Doc (State Value) a
-           -> Value
-           -> Either (Description Doc) a
-parseAeson m = evalState (consumer m)
-
--- | Describe a consumer.
-describeAeson :: Consumer Doc (State Value) a -> Description Doc
-describeAeson (Consumer desc _) = evalState desc (toJSON ())
-
-submission :: Consumer Doc (State Value) Submission
-submission =
-  obj "Submission"
-      (Submission
-        <$> key "token" (integer "Submission token; see the API docs")
-        <*> key "title" (text "Submission title")
-        <*> key "comment" (text "Submission comment")
-        <*> key "subreddit" (integer "The ID of the subreddit"))
-
-sample :: Value
-sample =
-  toJSON (object
-            ["token" .= 123
-            ,"title" .= "Some title"
-            ,"comment" .= "This is good"
-            ,"subreddit" .= 234214])
+  consumer (d,)
+           (\s ->
+              case fromJSON s of
+                Error{} -> (Left d,s)
+                Success a -> (Right a,s))
+  where d = Unit (Integer doc)
