@@ -257,8 +257,47 @@ The bad sample yields an informative message that:
 
 ## Parsing Attempto Controlled English for MUD commands
 
-TBA. Will use [this package](http://chrisdone.com/posts/attempto-controlled-english).
+TBA. Will use
+[this package](http://chrisdone.com/posts/attempto-controlled-english).
+
+With ACE you can parse into:
+
+``` haskell
+parsed complV "<distrans-verb> a <noun> <prep> a <noun>" ==
+Right (ComplVDisV (DistransitiveV "<distrans-verb>")
+                  (ComplNP (NPCoordUnmarked (UnmarkedNPCoord anoun Nothing)))
+                  (ComplPP (PP (Preposition "<prep>")
+                               (NPCoordUnmarked (UnmarkedNPCoord anoun Nothing)))))
+```
+
+Which I can then further parse with `descriptive` to yield
+descriptions like:
+
+> <verb-phrase> [<noun-phrase> ..]
+
+Or similar.
 
 ## Producing questions and consuming the answers in Haskell
 
-TBA. Will be a generalization of [this type](https://github.com/chrisdone/exercise/blob/master/src/Exercise/Types.hs#L20).
+TBA. Will be a generalization of
+[this type](https://github.com/chrisdone/exercise/blob/master/src/Exercise/Types.hs#L20).
+
+It is a library which I am working on in parallel which will ask the
+user questions and then validate the answers. Current output is like
+this:
+
+``` haskell
+λ> describe (greaterThan 4 (integerExpr (parse id expr exercise)))
+an integer greater than 4
+λ> eval (greaterThan 4 (integerExpr (parse id expr exercise))) $(someHaskell "x = 1")
+Left expected an expression, but got a declaration
+λ> eval (greaterThan 4 (integerExpr (parse id expr exercise))) $(someHaskell "x")
+Left expected an integer, but got an expression
+λ> eval (greaterThan 4 (integerExpr (parse id expr exercise))) $(someHaskell "3")
+Left expected an integer greater than 4
+λ> eval (greaterThan 4 (integerExpr (parse id expr exercise))) $(someHaskell "5")
+Right 5
+```
+
+This is also couples description with validation, but I will probably
+rewrite it with this `descriptive` library.
