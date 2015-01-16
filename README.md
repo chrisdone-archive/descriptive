@@ -275,7 +275,9 @@ descriptions like:
 
 > <verb-phrase> [<noun-phrase> ..]
 
-Or similar.
+Or similar. Which would be handy for a MUD so that a user can write:
+
+> Put the sword on the table.
 
 ## Producing questions and consuming the answers in Haskell
 
