@@ -230,7 +230,7 @@ The bad sample yields an informative message that:
 
 ## Parsing Attempto Controlled English for MUD commands
 
-TBA.
+TBA. Will use [this package](http://chrisdone.com/posts/attempto-controlled-english).
 
 ## Producing questions and consuming the answers in Haskell
 
