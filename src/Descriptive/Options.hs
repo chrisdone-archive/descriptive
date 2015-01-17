@@ -56,11 +56,10 @@ prefix :: Text -> Text -> Consumer [Text] Option Text
 prefix pref help =
   consumer (d,)
            (\s ->
-              case find pred s of
+              case find (T.isPrefixOf ("-" <> pref)) s of
                 Nothing -> (Left d,s)
                 Just a -> (Right a, delete a s))
-  where pred = T.isPrefixOf ("-" <> pref)
-        d = Unit (Prefix pref help)
+  where d = Unit (Prefix pref help)
 
 -- | Find a named argument.
 arg :: Text -> Text -> Consumer [Text] Option Text

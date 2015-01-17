@@ -13,7 +13,6 @@ import Data.Bifunctor
 import Data.Monoid
 import Descriptive
 
-import Control.Applicative
 import Data.Aeson
 import Data.Aeson.Types
 import Data.Text (Text)
