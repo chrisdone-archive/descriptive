@@ -171,9 +171,9 @@ server =
      (Unit (Arg "port" "Port to listen on"))
 ,[])
 λ> consume server ["start","any","--port","1234","-fdev"]
-(Right ("start","any",True,"1234"),["--port","1234","-fdev"])
+(Right ("start","any",True,"1234"),[])
 λ> consume server ["start","any","--port","1234"]
-(Right ("start","any",False,"1234"),["--port","1234"])
+(Right ("start","any",False,"1234"),[])
 λ> consume server ["start","any"]
 (Left (Unit (Arg "port" "Port to listen on")),[])
 ```

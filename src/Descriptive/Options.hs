@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -6,11 +7,12 @@
 
 module Descriptive.Options where
 
+import           Descriptive
+
 import           Data.List
 import           Data.Monoid
 import           Data.Text (Text)
 import qualified Data.Text as T
-import           Descriptive
 
 data Option
   = AnyString !Text
@@ -46,18 +48,19 @@ flag :: Text -> Text -> Consumer [Text] Option Bool
 flag name help =
   consumer (d,)
            (\s ->
-              (Right (elem ("-f" <> name) s),s))
+              (Right (elem ("-f" <> name) s),filter (/= "-f" <> name) s))
   where d = Unit (Flag name help)
 
 -- | Find an argument prefixed by -X.
 prefix :: Text -> Text -> Consumer [Text] Option Text
-prefix prefix help =
+prefix pref help =
   consumer (d,)
            (\s ->
-              case find (T.isPrefixOf ("-" <> prefix)) s of
+              case find pred s of
                 Nothing -> (Left d,s)
-                Just rest -> (Right rest,s))
-  where d = Unit (Prefix prefix help)
+                Just a -> (Right a, delete a s))
+  where pred = T.isPrefixOf ("-" <> pref)
+        d = Unit (Prefix pref help)
 
 -- | Find a named argument.
 arg :: Text -> Text -> Consumer [Text] Option Text
@@ -72,5 +75,6 @@ arg name help =
                      case lookup (i + 1) indexedArgs of
                        Nothing -> (Left d,s)
                        Just text ->
-                         (Right text,s))
+                         (Right text
+                         ,map snd (filter (\(j,_) -> j /= i && j /= i + 1) indexedArgs)))
   where d = Unit (Arg name help)
