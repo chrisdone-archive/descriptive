@@ -121,6 +121,6 @@ textDescription = go . clean
 textOpt :: Option -> Text
 textOpt (AnyString t) = T.map toUpper t
 textOpt (Constant t) = t
-textOpt (Flag t _) = "-f" <> t
+textOpt (Flag t _) = "--" <> t
 textOpt (Arg t _) = "-" <> t <> " <...>"
 textOpt (Prefix t _) = "-" <> t <> "<...>"
