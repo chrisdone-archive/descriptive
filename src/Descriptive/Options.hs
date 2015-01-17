@@ -6,16 +6,18 @@
 
 module Descriptive.Options where
 
-import Descriptive
-import Data.List
-import Data.Monoid
-import Data.Text (Text)
+import           Data.List
+import           Data.Monoid
+import           Data.Text (Text)
+import qualified Data.Text as T
+import           Descriptive
 
 data Option
   = AnyString !Text
   | Constant !Text
   | Flag !Text !Text
   | Arg !Text !Text
+  | Prefix !Text !Text
   deriving (Show)
 
 -- | Consume one argument from the argument list.
@@ -39,7 +41,7 @@ constant x' =
                 _ -> (Left d,s))
   where d = Unit (Constant x')
 
--- | Consume a short boolean flag.
+-- | Find a short boolean flag.
 flag :: Text -> Text -> Consumer [Text] Option Bool
 flag name help =
   consumer (d,)
@@ -47,7 +49,17 @@ flag name help =
               (Right (elem ("-f" <> name) s),s))
   where d = Unit (Flag name help)
 
--- | Consume a named argument.
+-- | Find an argument prefixed by -X.
+prefix :: Text -> Text -> Consumer [Text] Option Text
+prefix prefix help =
+  consumer (d,)
+           (\s ->
+              case find (T.isPrefixOf ("-" <> prefix)) s of
+                Nothing -> (Left d,s)
+                Just rest -> (Right rest,s))
+  where d = Unit (Prefix prefix help)
+
+-- | Find a named argument.
 arg :: Text -> Text -> Consumer [Text] Option Text
 arg name help =
   consumer (d,)
