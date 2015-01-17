@@ -7,7 +7,16 @@
 
 -- | Descriptive parsers.
 
-module Descriptive where
+module Descriptive
+  (Description(..)
+  ,Bound(..)
+  ,Consumer(..)
+  ,consumer
+  ,wrap
+  ,sequencing
+  ,consume
+  ,describe)
+  where
 
 import Control.Applicative
 import Control.Arrow
@@ -90,27 +99,31 @@ instance Alternative (Consumer s d) where
                       (Right a2,s'') ->
                         (Right a2,s'')
                   (Right a1,s') -> (Right a1,s'))
-  some =
-    wrap (\s d -> first redescribe (d s))
-         (\s _ r ->
-            fix (\go !i s' as ->
-                   case r s' of
-                     (Right a,s'') ->
-                       go (i + 1)
-                          s''
-                          (a : as)
-                     (Left e,s'')
-                       | i >= minb ->
-                         (Right (reverse as),s')
-                       | otherwise ->
-                         (Left (redescribe e),s''))
-                0
-                s
-                [])
-    where redescribe =
-            Bounded minb UnlimitedBound
-          minb = 1
-  many x = some x <|> pure []
+  some = sequenceHelper 1
+  many = sequenceHelper 0
+
+-- | An internal sequence maker which describes itself better than
+-- regular Alternative, and is strict, not lazy.
+sequenceHelper :: Integer -> Consumer t d a -> Consumer t d [a]
+sequenceHelper minb =
+  wrap (\s d -> first redescribe (d s))
+       (\s _ r ->
+          fix (\go !i s' as ->
+                 case r s' of
+                   (Right a,s'') ->
+                     go (i + 1)
+                        s''
+                        (a : as)
+                   (Left e,s'')
+                     | i >= minb ->
+                       (Right (reverse as),s')
+                     | otherwise ->
+                       (Left (redescribe e),s''))
+              0
+              s
+              [])
+  where redescribe =
+          Bounded minb UnlimitedBound
 
 instance (Monoid a) => Monoid (Either (Description d) a) where
   mempty = Right mempty
