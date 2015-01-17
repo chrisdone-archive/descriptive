@@ -9,11 +9,13 @@ module Descriptive.Options where
 
 import           Descriptive
 
+import           Data.Char
 import           Data.List
 import           Data.Monoid
 import           Data.Text (Text)
 import qualified Data.Text as T
 
+-- | Description of a commandline option.
 data Option
   = AnyString !Text
   | Constant !Text
@@ -21,6 +23,40 @@ data Option
   | Arg !Text !Text
   | Prefix !Text !Text
   deriving (Show)
+
+-- | Make a text description of the command line options.
+textDescription :: Description Option -> Text
+textDescription = go . clean
+  where clean (And None a) = clean a
+        clean (And a None) = clean a
+        clean (Or a None) = clean a
+        clean (Or None a) = clean a
+        clean (And a b) = And (clean a) (clean b)
+        clean (Or a b) = Or (clean a) (clean b)
+        clean a = a
+        go d =
+          case d of
+            Unit o -> textOpt o
+            Bounded min' _ d' ->
+              "[" <> go d' <> "]" <>
+              if min' == 0
+                 then "*"
+                 else "+"
+            And a b -> go a <> " " <> go b
+            Or a b -> "(" <> go a <> "|" <> go b <> ")"
+            Sequence xs ->
+              T.intercalate " "
+                            (map go xs)
+            Wrap o d' -> textOpt o <> " " <> go d'
+            None -> ""
+
+-- | Make a text description of an option.
+textOpt :: Option -> Text
+textOpt (AnyString t) = T.map toUpper t
+textOpt (Constant t) = t
+textOpt (Flag t _) = "-f" <> t
+textOpt (Arg t _) = "-" <> t <> " <...>"
+textOpt (Prefix t _) = "-" <> t <> "<...>"
 
 -- | Consume one argument from the argument list.
 anyString :: Text -> Consumer [Text] Option Text
@@ -58,7 +94,7 @@ prefix pref help =
            (\s ->
               case find (T.isPrefixOf ("-" <> pref)) s of
                 Nothing -> (Left d,s)
-                Just a -> (Right a, delete a s))
+                Just a -> (Right (T.drop (T.length pref + 1) a), delete a s))
   where d = Unit (Prefix pref help)
 
 -- | Find a named argument.
