@@ -93,7 +93,7 @@ instance Alternative (Consumer s d) where
              (\s ->
                 case consumerParse a s of
                   (Left e1,s') ->
-                    case consumerParse b s' of
+                    case consumerParse b s of
                       (Left e2,s'') ->
                         (Left (Or e1 e2),s'')
                       (Right a2,s'') ->
