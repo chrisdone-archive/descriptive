@@ -92,12 +92,12 @@ instance Alternative (Consumer s d) where
                 in (Or d1 d2,s''))
              (\s ->
                 case consumerParse a s of
-                  (Left e1,s') ->
+                  (Left e1,_) ->
                     case consumerParse b s of
-                      (Left e2,s'') ->
-                        (Left (Or e1 e2),s'')
-                      (Right a2,s'') ->
-                        (Right a2,s'')
+                      (Left e2,s') ->
+                        (Left (Or e1 e2),s')
+                      (Right a2,s') ->
+                        (Right a2,s')
                   (Right a1,s') -> (Right a1,s'))
   some = sequenceHelper 1
   many = sequenceHelper 0
