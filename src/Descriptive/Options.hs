@@ -5,7 +5,18 @@
 
 -- | Command-line options parser.
 
-module Descriptive.Options where
+module Descriptive.Options
+  (-- * Combinators
+   anyString
+  ,constant
+  ,flag
+  ,prefix
+  ,arg
+  -- * Description
+  ,Option(..)
+  ,textDescription
+  ,textOpt)
+  where
 
 import           Descriptive
 
@@ -23,40 +34,6 @@ data Option
   | Arg !Text !Text
   | Prefix !Text !Text
   deriving (Show)
-
--- | Make a text description of the command line options.
-textDescription :: Description Option -> Text
-textDescription = go . clean
-  where clean (And None a) = clean a
-        clean (And a None) = clean a
-        clean (Or a None) = clean a
-        clean (Or None a) = clean a
-        clean (And a b) = And (clean a) (clean b)
-        clean (Or a b) = Or (clean a) (clean b)
-        clean a = a
-        go d =
-          case d of
-            Unit o -> textOpt o
-            Bounded min' _ d' ->
-              "[" <> go d' <> "]" <>
-              if min' == 0
-                 then "*"
-                 else "+"
-            And a b -> go a <> " " <> go b
-            Or a b -> "(" <> go a <> "|" <> go b <> ")"
-            Sequence xs ->
-              T.intercalate " "
-                            (map go xs)
-            Wrap o d' -> textOpt o <> " " <> go d'
-            None -> ""
-
--- | Make a text description of an option.
-textOpt :: Option -> Text
-textOpt (AnyString t) = T.map toUpper t
-textOpt (Constant t) = t
-textOpt (Flag t _) = "-f" <> t
-textOpt (Arg t _) = "-" <> t <> " <...>"
-textOpt (Prefix t _) = "-" <> t <> "<...>"
 
 -- | Consume one argument from the argument list.
 anyString :: Text -> Consumer [Text] Option Text
@@ -113,3 +90,37 @@ arg name help =
                          (Right text
                          ,map snd (filter (\(j,_) -> j /= i && j /= i + 1) indexedArgs)))
   where d = Unit (Arg name help)
+
+-- | Make a text description of the command line options.
+textDescription :: Description Option -> Text
+textDescription = go . clean
+  where clean (And None a) = clean a
+        clean (And a None) = clean a
+        clean (Or a None) = clean a
+        clean (Or None a) = clean a
+        clean (And a b) = And (clean a) (clean b)
+        clean (Or a b) = Or (clean a) (clean b)
+        clean a = a
+        go d =
+          case d of
+            Unit o -> textOpt o
+            Bounded min' _ d' ->
+              "[" <> go d' <> "]" <>
+              if min' == 0
+                 then "*"
+                 else "+"
+            And a b -> go a <> " " <> go b
+            Or a b -> "(" <> go a <> "|" <> go b <> ")"
+            Sequence xs ->
+              T.intercalate " "
+                            (map go xs)
+            Wrap o d' -> textOpt o <> " " <> go d'
+            None -> ""
+
+-- | Make a text description of an option.
+textOpt :: Option -> Text
+textOpt (AnyString t) = T.map toUpper t
+textOpt (Constant t) = t
+textOpt (Flag t _) = "-f" <> t
+textOpt (Arg t _) = "-" <> t <> " <...>"
+textOpt (Prefix t _) = "-" <> t <> "<...>"

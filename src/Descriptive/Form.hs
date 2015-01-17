@@ -3,7 +3,14 @@
 
 -- | Validating form with named inputs.
 
-module Descriptive.Form where
+module Descriptive.Form
+  (-- * Combinators
+   input
+  ,validate
+  -- * Description
+  ,Form (..)
+  )
+  where
 
 import           Descriptive
 
@@ -18,7 +25,7 @@ data Form
   | Constraint !Text
   deriving (Show)
 
--- | Consume any character.
+-- | Consume any input value.
 input :: Text -> Consumer (Map Text Text) Form Text
 input name =
   consumer (d,)
@@ -30,9 +37,9 @@ input name =
   where d = Unit (Input name)
 
 -- | Validate a form input with a description of what's required.
-validate :: Text
-         -> (a -> Maybe b)
-         -> Consumer (Map Text Text) Form a
+validate :: Text -- ^ Description of what it expects.
+         -> (a -> Maybe b) -- ^ Attempt to parse the value.
+         -> Consumer (Map Text Text) Form a -- ^ Consumer to add validation to.
          -> Consumer (Map Text Text) Form b
 validate d' check =
   wrap (\s d -> redescribe (d s))

@@ -7,7 +7,16 @@
 
 -- | A JSON API which describes itself.
 
-module Descriptive.JSON where
+module Descriptive.JSON
+  (-- * Combinators
+   obj
+  ,key
+  ,string
+  ,integer
+  -- * Description
+  ,Doc(..)
+  )
+  where
 
 import Data.Bifunctor
 import Data.Monoid
@@ -26,7 +35,9 @@ data Doc
   deriving (Show)
 
 -- | Consume an object.
-obj :: Text -> Consumer Object Doc a -> Consumer Value Doc a
+obj :: Text -- ^ Description of what the object is.
+    -> Consumer Object Doc a -- ^ An object consumer.
+    -> Consumer Value Doc a
 obj desc =
   wrap (\v d -> (Wrap doc (fst (d mempty)),v))
        (\v _ p ->
@@ -40,7 +51,9 @@ obj desc =
   where doc = Struct desc
 
 -- | Consume from object at the given key.
-key :: Text -> Consumer Value Doc a -> Consumer Object Doc a
+key :: Text -- ^ The key to lookup.
+    -> Consumer Value Doc a -- ^ A value consumer of the object at the key.
+    -> Consumer Object Doc a
 key k =
   wrap (\o d ->
           first (Wrap doc)
@@ -57,7 +70,8 @@ key k =
   where doc = Key k
 
 -- | Consume a string.
-string :: Text -> Consumer Value Doc Text
+string :: Text -- ^ Description of what the string is for.
+       -> Consumer Value Doc Text
 string doc =
   consumer (d,)
            (\s ->
@@ -67,7 +81,8 @@ string doc =
   where d = Unit (Text doc)
 
 -- | Consume an integer.
-integer :: Text -> Consumer Value Doc Integer
+integer :: Text -- ^ Description of what the integer is for.
+        -> Consumer Value Doc Integer
 integer doc =
   consumer (d,)
            (\s ->

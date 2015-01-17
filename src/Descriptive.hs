@@ -8,20 +8,55 @@
 -- | Descriptive parsers.
 
 module Descriptive
-  (Description(..)
+  (-- * Consuming and describing
+   consume
+  ,describe
+   -- * Lower-level runners
+  ,runConsumer
+  ,runDescription
+  -- * Types
+  ,Description(..)
   ,Bound(..)
   ,Consumer(..)
+  -- * Combinators
   ,consumer
   ,wrap
-  ,sequencing
-  ,consume
-  ,describe)
+  ,sequencing)
   where
 
 import Control.Applicative
 import Control.Arrow
 import Data.Function
 import Data.Monoid
+
+--------------------------------------------------------------------------------
+-- Running
+
+-- | Run a consumer.
+consume :: Consumer s d a -- ^ The consumer to run.
+        -> s -- ^ Initial state.
+        -> Either (Description d) a
+consume (Consumer _ m) = fst . m
+
+-- | Describe a consumer.
+describe :: Consumer s d a -- ^ The consumer to run.
+         -> s -- ^ Initial state. Can be empty if you don't use it for
+              -- generating descriptions.
+         -> Description d -- ^ A description and resultant state.
+describe (Consumer desc _) = fst . desc
+
+-- | Run a consumer.
+runConsumer :: Consumer s d a -- ^ The consumer to run.
+            -> s -- ^ Initial state.
+            -> (Either (Description d) a,s)
+runConsumer (Consumer _ m) = m
+
+-- | Describe a consumer.
+runDescription :: Consumer s d a -- ^ The consumer to run.
+               -> s -- ^ Initial state. Can be empty if you don't use it for
+                    -- generating descriptions.
+               -> (Description d,s) -- ^ A description and resultant state.
+runDescription (Consumer desc _) = desc
 
 --------------------------------------------------------------------------------
 -- Types
@@ -92,12 +127,12 @@ instance Alternative (Consumer s d) where
                 in (Or d1 d2,s''))
              (\s ->
                 case consumerParse a s of
-                  (Left e1,s') ->
+                  (Left e1,_) ->
                     case consumerParse b s of
-                      (Left e2,s'') ->
-                        (Left (Or e1 e2),s'')
-                      (Right a2,s'') ->
-                        (Right a2,s'')
+                      (Left e2,s') ->
+                        (Left (Or e1 e2),s')
+                      (Right a2,s') ->
+                        (Right a2,s')
                   (Right a1,s') -> (Right a1,s'))
   some = sequenceHelper 1
   many = sequenceHelper 0
@@ -143,20 +178,22 @@ instance (Monoid a) => Monoid (Consumer s d a) where
 -- Combinators
 
 -- | Make a consumer.
-consumer :: (s -> (Description d,s)) -> (s -> (Either (Description d) a,s)) -> Consumer s d a
+consumer :: (s -> (Description d,s)) -- ^ Produce description based on the state.
+         -> (s -> (Either (Description d) a,s)) -- ^ Parse the state and maybe transform it if desired.
+         -> Consumer s d a
 consumer d p =
   Consumer d p
 
 -- | Wrap a consumer with another consumer.
-wrap :: (s -> (t -> (Description d,t)) -> (Description d,s))
-     -> (s -> (t -> (Description d,t)) -> (t -> (Either (Description d) a,t)) -> (Either (Description d) b,s))
-     -> Consumer t d a
-     -> Consumer s d b
+wrap :: (s -> (t -> (Description d,t)) -> (Description d,s)) -- ^ Transformer the description.
+     -> (s -> (t -> (Description d,t)) -> (t -> (Either (Description d) a,t)) -> (Either (Description d) b,s)) -- ^ Transform the parser. Can re-run the parser if desired.
+     -> Consumer t d a -- ^ The consumer to transform.
+     -> Consumer s d b -- ^ A new consumer with a potentially new state type.
 wrap redescribe reparse (Consumer d p) =
   Consumer (\s -> redescribe s d)
            (\s -> reparse s d p)
 
--- | Compose contiguous items into one sequence.
+-- | Compose contiguous items into one sequence. Similar to 'sequenceA'.
 sequencing :: [Consumer d s a] -> Consumer d s [a]
 sequencing =
   wrap (\s d ->
@@ -169,14 +206,3 @@ sequencing =
         se x = [x]
         go (x:xs) = (:) <$> x <*> sequencing xs
         go [] = mempty
-
---------------------------------------------------------------------------------
--- Running
-
--- | Run a consumer.
-consume :: Consumer s d a -> s -> (Either (Description d) a,s)
-consume (Consumer _ m) = m
-
--- | Describe a consumer.
-describe :: Consumer s d a -> s -> (Description d,s)
-describe (Consumer desc _) = desc
