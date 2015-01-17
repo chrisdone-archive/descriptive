@@ -90,6 +90,27 @@ instance Alternative (Consumer s d) where
                       (Right a2,s'') ->
                         (Right a2,s'')
                   (Right a1,s') -> (Right a1,s'))
+  some =
+    wrap (\s d -> first redescribe (d s))
+         (\s _ r ->
+            fix (\go !i s' as ->
+                   case r s' of
+                     (Right a,s'') ->
+                       go (i + 1)
+                          s''
+                          (a : as)
+                     (Left e,s'')
+                       | i >= minb ->
+                         (Right (reverse as),s')
+                       | otherwise ->
+                         (Left (redescribe e),s''))
+                0
+                s
+                [])
+    where redescribe =
+            Bounded minb UnlimitedBound
+          minb = 1
+  many x = some x <|> pure []
 
 instance (Monoid a) => Monoid (Either (Description d) a) where
   mempty = Right mempty
@@ -121,28 +142,6 @@ wrap :: (s -> (t -> (Description d,t)) -> (Description d,s))
 wrap redescribe reparse (Consumer d p) =
   Consumer (\s -> redescribe s d)
            (\s -> reparse s d p)
-
--- | Consume many of the given consumer.
-zeroOrMore :: Consumer s d a -> Consumer s d [a]
-zeroOrMore =
-  wrap (\s d -> first redescribe (d s))
-       (\s _ r ->
-          fix (\go !i s' as ->
-                 case r s' of
-                   (Right a,s'') ->
-                     go (i + 1)
-                        s''
-                        (a : as)
-                   (Left e,s'')
-                     | i >= minb ->
-                       (Right (reverse as),s')
-                     | otherwise ->
-                       (Left (redescribe e),s''))
-              0
-              s
-              [])
-  where redescribe = Bounded minb UnlimitedBound
-        minb = 0
 
 -- | Compose contiguous items into one sequence.
 sequencing :: [Consumer d s a] -> Consumer d s [a]

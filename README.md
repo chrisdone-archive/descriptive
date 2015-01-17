@@ -73,15 +73,15 @@ See below for some examples of this library.
 See `Descriptive.Char`.
 
 ``` haskell
-λ> describe (zeroOrMore (char 'k') <> string "abc") mempty
+λ> describe (many (char 'k') <> string "abc") mempty
 (And (Bounded 0 UnlimitedBound (Unit "k"))
      (Sequence [Unit "a",Sequence [Unit "b",Sequence [Unit "c",Sequence []]]])
 ,"")
-λ> consume (zeroOrMore (char 'k') <> string "abc") "kkkabc"
+λ> consume (many (char 'k') <> string "abc") "kkkabc"
 (Right "kkkabc","")
-λ> consume (zeroOrMore (char 'k') <> string "abc") "kkkab"
+λ> consume (many (char 'k') <> string "abc") "kkkab"
 (Left (Unit "a character"),"")
-λ> consume (zeroOrMore (char 'k') <> string "abc") "kkkabj"
+λ> consume (many (char 'k') <> string "abc") "kkkabj"
 (Left (Unit "c"),"")
 ```
 
