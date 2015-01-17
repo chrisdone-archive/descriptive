@@ -93,28 +93,41 @@ arg name help =
 
 -- | Make a text description of the command line options.
 textDescription :: Description Option -> Text
-textDescription = go . clean
+textDescription = go False . clean
   where clean (And None a) = clean a
         clean (And a None) = clean a
         clean (Or a None) = clean a
         clean (Or None a) = clean a
-        clean (And a b) = And (clean a) (clean b)
-        clean (Or a b) = Or (clean a) (clean b)
+        clean (And a b) =
+          And (clean a)
+              (clean b)
+        clean (Or a b) =
+          Or (clean a)
+             (clean b)
         clean a = a
-        go d =
+        go inor d =
           case d of
             Unit o -> textOpt o
             Bounded min' _ d' ->
-              "[" <> go d' <> "]" <>
+              "[" <> go inor d' <> "]" <>
               if min' == 0
                  then "*"
                  else "+"
-            And a b -> go a <> " " <> go b
-            Or a b -> "(" <> go a <> "|" <> go b <> ")"
+            And a b -> go inor a <> " " <> go inor b
+            Or a b ->
+              (if inor
+                  then ""
+                  else "(") <>
+              go True a <>
+              "|" <>
+              go True b <>
+              (if inor
+                  then ""
+                  else ")")
             Sequence xs ->
               T.intercalate " "
-                            (map go xs)
-            Wrap o d' -> textOpt o <> " " <> go d'
+                            (map (go inor) xs)
+            Wrap o d' -> textOpt o <> " " <> go inor d'
             None -> ""
 
 -- | Make a text description of an option.
