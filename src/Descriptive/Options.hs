@@ -61,7 +61,7 @@ flag :: Text -> Text -> Consumer [Text] Option Bool
 flag name help =
   consumer (d,)
            (\s ->
-              (Right (elem ("-f" <> name) s),filter (/= "-f" <> name) s))
+              (Right (elem ("--" <> name) s),filter (/= "--" <> name) s))
   where d = Unit (Flag name help)
 
 -- | Find an argument prefixed by -X.
