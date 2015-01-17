@@ -3,20 +3,6 @@
 {-# LANGUAGE FlexibleContexts #-}
 
 -- | Consuming form a list of characters.
---
--- Examples:
---
--- λ> describe (zeroOrMore (char 'k') <> string "abc") []
--- (And (Bounded 0 UnlimitedBound (Unit "k")) (And (Unit "a") (And (Unit "b") (And (Unit "c") None))),"")
---
--- λ> consumer (zeroOrMore (char 'k') <> string "abc") "kkkabc"
--- (Right "kkkabc","")
---
--- λ> consumer (zeroOrMore (char 'k') <> string "abc") "kkkabq"
--- (Left (Unit "c"),"")
---
--- λ> consumer (zeroOrMore (char 'k') <> string "abc") "kkkab"
--- (Left (Unit "a character"),"")
 
 module Descriptive.Char where
 
