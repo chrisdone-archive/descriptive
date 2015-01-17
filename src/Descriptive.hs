@@ -11,7 +11,7 @@ module Descriptive where
 
 import Control.Applicative
 import Control.Arrow
-import Control.Monad.State.Strict
+import Data.Function
 import Data.Monoid
 
 --------------------------------------------------------------------------------
@@ -22,6 +22,7 @@ data Description a
   = Unit !a
   | Bounded !Integer !Bound !(Description a)
   | And !(Description a) !(Description a)
+  | Or !(Description a) !(Description a)
   | Sequence [Description a]
   | Wrap a (Description a)
   | None
@@ -39,7 +40,8 @@ data Bound
 
 -- | A consumer.
 data Consumer s d a =
-  Consumer (s -> (Description d,s)) (s -> (Either (Description d) a,s))
+  Consumer {consumerDesc :: s -> (Description d,s)
+           ,consumerParse :: s -> (Either (Description d) a,s)}
 
 instance Functor (Consumer s d) where
   fmap f (Consumer d p) =
@@ -69,6 +71,25 @@ instance Applicative (Consumer s d) where
                          Left e -> (Left e,s'')
                          Right a ->
                            (Right (f a),s''))
+
+instance Alternative (Consumer s d) where
+  empty =
+    Consumer (\s -> (mempty,s))
+             (\s -> (Left mempty,s))
+  a <|> b =
+    Consumer (\s ->
+                let !(d1,s') = consumerDesc a s
+                    !(d2,s'') = consumerDesc b s'
+                in (Or d1 d2,s''))
+             (\s ->
+                case consumerParse a s of
+                  (Left e1,s') ->
+                    case consumerParse b s' of
+                      (Left e2,s'') ->
+                        (Left (Or e1 e2),s'')
+                      (Right a2,s'') ->
+                        (Right a2,s'')
+                  (Right a1,s') -> (Right a1,s'))
 
 instance (Monoid a) => Monoid (Either (Description d) a) where
   mempty = Right mempty
@@ -129,7 +150,7 @@ sequencing =
   wrap (\s d ->
           first (Sequence . se)
                 (d s))
-       (\s d p -> p s) .
+       (\s _ p -> p s) .
   go
   where se (And x y) = x : se y
         se None = []
