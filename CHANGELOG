@@ -1,3 +1,8 @@
+0.2.0:
+	* Change the type of flag.
+	* Add the switch combinator (used to be “flag”).
+	* Add the “stop” combinator.
+
 0.1.1:
 	* Printer fix for options consumer.
 

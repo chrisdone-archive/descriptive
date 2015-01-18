@@ -134,9 +134,9 @@ options :: Spec
 options =
   do it "describe options"
         (describe server [] ==
-         And (And (And (Unit (Options.Constant "start"))
+         And (And (And (Unit (Options.Constant "start" "cmd"))
                        (Unit (Options.AnyString "SERVER_NAME")))
-                  (Unit (Options.Flag "dev" "Enable dev mode?")))
+                  (Or (Unit (Options.Flag "dev" "Enable dev mode?")) None))
              (Unit (Options.Arg "port" "Port to listen on")))
      it "succeeding options"
         (consume server ["start","any","--port","1234","--dev"] ==
@@ -149,9 +149,9 @@ options =
          Failed (Unit (Options.Arg "port" "Port to listen on")))
   where server =
           ((,,,) <$>
-           Options.constant "start" <*>
+           Options.constant "start" "cmd" <*>
            Options.anyString "SERVER_NAME" <*>
-           Options.flag "dev" "Enable dev mode?" <*>
+           Options.switch "dev" "Enable dev mode?" <*>
            Options.arg "port" "Port to listen on")
 
 --------------------------------------------------------------------------------
