@@ -1,7 +1,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ExtendedDefaultRules #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE NoMonomorphismRestriction #-}
+{-# OPTIONS_GHC -fno-warn-type-defaults #-}
 
 -- | Test suite for ACE.
 
@@ -18,7 +18,6 @@ import qualified Descriptive.Form as Form
 import qualified Descriptive.Formlet as Formlet
 import qualified Descriptive.JSON as JSON
 import qualified Descriptive.Options as Options
-import           Test.HUnit
 import           Test.Hspec (Spec,it,hspec)
 import qualified Test.Hspec as Hspec
 
