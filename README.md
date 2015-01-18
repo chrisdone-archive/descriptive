@@ -74,9 +74,8 @@ See `Descriptive.Char`.
 
 ``` haskell
 λ> describe (many (char 'k') <> string "abc") mempty
-(And (Bounded 0 UnlimitedBound (Unit "k"))
-     (Sequence [Unit "a",Sequence [Unit "b",Sequence [Unit "c",Sequence []]]])
-,"")
+And (Bounded 0 UnlimitedBound (Unit "k"))
+    (Sequence [Unit "a",Sequence [Unit "b",Sequence [Unit "c",Sequence []]]])
 λ> consume (many (char 'k') <> string "abc") "kkkabc"
 (Succeeded "kkkabc")
 λ> consume (many (char 'k') <> string "abc") "kkkab"
