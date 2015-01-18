@@ -33,7 +33,7 @@ data Option
   | Flag !Text !Text
   | Arg !Text !Text
   | Prefix !Text !Text
-  deriving (Show)
+  deriving (Show,Eq)
 
 -- | Consume one argument from the argument list.
 anyString :: Text -> Consumer [Text] Option Text
@@ -41,8 +41,8 @@ anyString help =
   consumer (d,)
            (\s ->
               case s of
-                [] -> (Left d,s)
-                (x:s') -> (Right x,s'))
+                [] -> (Failed d,s)
+                (x:s') -> (Succeeded x,s'))
   where d = Unit (AnyString help)
 
 -- | Consume one argument from the argument list.
@@ -52,8 +52,8 @@ constant x' =
            (\s ->
               case s of
                 (x:s') | x == x' ->
-                  (Right x,s')
-                _ -> (Left d,s))
+                  (Succeeded x,s')
+                _ -> (Failed d,s))
   where d = Unit (Constant x')
 
 -- | Find a short boolean flag.
@@ -61,7 +61,7 @@ flag :: Text -> Text -> Consumer [Text] Option Bool
 flag name help =
   consumer (d,)
            (\s ->
-              (Right (elem ("--" <> name) s),filter (/= "--" <> name) s))
+              (Succeeded (elem ("--" <> name) s),filter (/= "--" <> name) s))
   where d = Unit (Flag name help)
 
 -- | Find an argument prefixed by -X.
@@ -70,8 +70,8 @@ prefix pref help =
   consumer (d,)
            (\s ->
               case find (T.isPrefixOf ("-" <> pref)) s of
-                Nothing -> (Left d,s)
-                Just a -> (Right (T.drop (T.length pref + 1) a), delete a s))
+                Nothing -> (Failed d,s)
+                Just a -> (Succeeded (T.drop (T.length pref + 1) a), delete a s))
   where d = Unit (Prefix pref help)
 
 -- | Find a named argument.
@@ -82,12 +82,12 @@ arg name help =
               let indexedArgs =
                     zip [0 :: Integer ..] s
               in case find ((== "--" <> name) . snd) indexedArgs of
-                   Nothing -> (Left d,s)
+                   Nothing -> (Failed d,s)
                    Just (i,_) ->
                      case lookup (i + 1) indexedArgs of
-                       Nothing -> (Left d,s)
+                       Nothing -> (Failed d,s)
                        Just text ->
-                         (Right text
+                         (Succeeded text
                          ,map snd (filter (\(j,_) -> j /= i && j /= i + 1) indexedArgs)))
   where d = Unit (Arg name help)
 

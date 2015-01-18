@@ -1,0 +1,3 @@
+0.1.0:
+
+* Change to Result type which supports Continued constructor.

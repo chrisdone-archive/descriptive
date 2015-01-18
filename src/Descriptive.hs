@@ -18,6 +18,7 @@ module Descriptive
   ,Description(..)
   ,Bound(..)
   ,Consumer(..)
+  ,Result(..)
   -- * Combinators
   ,consumer
   ,wrap
@@ -25,7 +26,7 @@ module Descriptive
   where
 
 import Control.Applicative
-import Control.Arrow
+import Data.Bifunctor
 import Data.Function
 import Data.Monoid
 
@@ -35,7 +36,7 @@ import Data.Monoid
 -- | Run a consumer.
 consume :: Consumer s d a -- ^ The consumer to run.
         -> s -- ^ Initial state.
-        -> Either (Description d) a
+        -> Result (Description d) a
 consume (Consumer _ m) = fst . m
 
 -- | Describe a consumer.
@@ -48,7 +49,7 @@ describe (Consumer desc _) = fst . desc
 -- | Run a consumer.
 runConsumer :: Consumer s d a -- ^ The consumer to run.
             -> s -- ^ Initial state.
-            -> (Either (Description d) a,s)
+            -> (Result (Description d) a,s)
 runConsumer (Consumer _ m) = m
 
 -- | Describe a consumer.
@@ -70,7 +71,7 @@ data Description a
   | Sequence [Description a]
   | Wrap a (Description a)
   | None
-  deriving (Show)
+  deriving (Show,Eq)
 
 instance Monoid (Description d) where
   mempty = None
@@ -80,26 +81,46 @@ instance Monoid (Description d) where
 data Bound
   = NaturalBound !Integer
   | UnlimitedBound
-  deriving (Show)
+  deriving (Show,Eq)
 
 -- | A consumer.
 data Consumer s d a =
   Consumer {consumerDesc :: s -> (Description d,s)
-           ,consumerParse :: s -> (Either (Description d) a,s)}
+           ,consumerParse :: s -> (Result (Description d) a,s)}
+
+-- | Some result.
+data Result e a
+  = Failed e    -- ^ The whole process failed.
+  | Succeeded a -- ^ The whole process succeeded.
+  | Continued e -- ^ There were errors but we continued to collect all the errors.
+  deriving (Show,Eq,Ord)
+
+instance Bifunctor Result where
+  second f r =
+    case r of
+      Succeeded a -> Succeeded (f a)
+      Failed e -> Failed e
+      Continued e -> Continued e
+  first f r =
+    case r of
+      Succeeded a -> Succeeded a
+      Failed e -> Failed (f e)
+      Continued e -> Continued (f e)
 
 instance Functor (Consumer s d) where
   fmap f (Consumer d p) =
     Consumer d
              (\s ->
                 case p s of
-                  (Left e,s') -> (Left e,s')
-                  (Right a,s') ->
-                    (Right (f a),s'))
+                  (Failed e,s') -> (Failed e,s')
+                  (Continued e,s') -> (Continued e,s')
+                  (Succeeded a,s') ->
+                    (Succeeded (f a),s'))
 
 instance Applicative (Consumer s d) where
   pure a =
     consumer (\s -> (mempty,s))
-             (\s -> (Right a,s))
+             (\s -> (Succeeded a,s))
   Consumer d pf <*> Consumer d' p' =
     consumer (\s ->
                 let !(e,s') = d s
@@ -109,17 +130,28 @@ instance Applicative (Consumer s d) where
                 let !(mf,s') = pf s
                     !(ma,s'') = p' s'
                 in case mf of
-                     Left e -> (Left e,s')
-                     Right f ->
+                     Failed e -> (Failed e,s')
+                     Continued e ->
                        case ma of
-                         Left e -> (Left e,s'')
-                         Right a ->
-                           (Right (f a),s''))
+                         Failed e' ->
+                           (Failed e',s'')
+                         Continued e' ->
+                           (Continued (e <> e'),s'')
+                         Succeeded _ ->
+                           (Continued e,s'')
+                     Succeeded f ->
+                       case ma of
+                         Continued e ->
+                           (Continued e,s'')
+                         Failed e ->
+                           (Failed e,s'')
+                         Succeeded a ->
+                           (Succeeded (f a),s''))
 
 instance Alternative (Consumer s d) where
   empty =
     Consumer (\s -> (mempty,s))
-             (\s -> (Left mempty,s))
+             (\s -> (Failed mempty,s))
   a <|> b =
     Consumer (\s ->
                 let !(d1,s') = consumerDesc a s
@@ -127,13 +159,24 @@ instance Alternative (Consumer s d) where
                 in (Or d1 d2,s''))
              (\s ->
                 case consumerParse a s of
-                  (Left e1,_) ->
+                  (Continued e1,s') ->
+                    case consumerParse b s' of
+                      (Failed e2,s'') ->
+                        (Failed e2,s'')
+                      (Continued e2,s'') ->
+                        (Continued (e1 <> e2),s'')
+                      (Succeeded a',s'') ->
+                        (Succeeded a',s'')
+                  (Failed e1,_) ->
                     case consumerParse b s of
-                      (Left e2,s') ->
-                        (Left (Or e1 e2),s')
-                      (Right a2,s') ->
-                        (Right a2,s')
-                  (Right a1,s') -> (Right a1,s'))
+                      (Failed e2,s') ->
+                        (Failed (Or e1 e2),s')
+                      (Continued e2,s'') ->
+                        (Continued e2,s'')
+                      (Succeeded a2,s') ->
+                        (Succeeded a2,s')
+                  (Succeeded a1,s') ->
+                    (Succeeded a1,s'))
   some = sequenceHelper 1
   many = sequenceHelper 0
 
@@ -145,30 +188,49 @@ sequenceHelper minb =
        (\s _ r ->
           fix (\go !i s' as ->
                  case r s' of
-                   (Right a,s'') ->
+                   (Succeeded a,s'') ->
                      go (i + 1)
                         s''
                         (a : as)
-                   (Left e,s'')
+                   (Continued e,s'') ->
+                     fix (\continue e' s''' ->
+                            case r s''' of
+                              (Continued e'',s'''') ->
+                                continue (e' <> e'') s''''
+                              (Succeeded{},s'''') ->
+                                continue e' s''''
+                              (Failed e'',s'''')
+                                | i >= minb ->
+                                  (Continued e',s''')
+                                | otherwise ->
+                                  (Failed (redescribe e''),s''''))
+                         e
+                         s''
+                   (Failed e,s'')
                      | i >= minb ->
-                       (Right (reverse as),s')
+                       (Succeeded (reverse as),s')
                      | otherwise ->
-                       (Left (redescribe e),s''))
+                       (Failed (redescribe e),s''))
               0
               s
               [])
-  where redescribe =
-          Bounded minb UnlimitedBound
+  where redescribe = Bounded minb UnlimitedBound
 
-instance (Monoid a) => Monoid (Either (Description d) a) where
-  mempty = Right mempty
+instance (Monoid a) => Monoid (Result (Description d) a) where
+  mempty = Succeeded mempty
   mappend x y =
     case x of
-      Left e -> Left e
-      Right a ->
+      Failed e -> Failed e
+      Continued e ->
         case y of
-          Left e -> Left e
-          Right b -> Right (a <> b)
+          Failed e' -> Failed e'
+          Continued e' -> Continued (e <> e')
+          Succeeded _ -> Continued e
+      Succeeded a ->
+        case y of
+          Failed e -> Failed e
+          Continued e -> Continued e
+          Succeeded b -> Succeeded (a <> b)
 
 instance (Monoid a) => Monoid (Consumer s d a) where
   mempty = Consumer (\s -> (mempty,s)) (\s -> (mempty,s))
@@ -179,14 +241,14 @@ instance (Monoid a) => Monoid (Consumer s d a) where
 
 -- | Make a consumer.
 consumer :: (s -> (Description d,s)) -- ^ Produce description based on the state.
-         -> (s -> (Either (Description d) a,s)) -- ^ Parse the state and maybe transform it if desired.
+         -> (s -> (Result (Description d) a,s)) -- ^ Parse the state and maybe transform it if desired.
          -> Consumer s d a
 consumer d p =
   Consumer d p
 
 -- | Wrap a consumer with another consumer.
 wrap :: (s -> (t -> (Description d,t)) -> (Description d,s)) -- ^ Transformer the description.
-     -> (s -> (t -> (Description d,t)) -> (t -> (Either (Description d) a,t)) -> (Either (Description d) b,s)) -- ^ Transform the parser. Can re-run the parser if desired.
+     -> (s -> (t -> (Description d,t)) -> (t -> (Result (Description d) a,t)) -> (Result (Description d) b,s)) -- ^ Transform the parser. Can re-run the parser if desired.
      -> Consumer t d a -- ^ The consumer to transform.
      -> Consumer s d b -- ^ A new consumer with a potentially new state type.
 wrap redescribe reparse (Consumer d p) =

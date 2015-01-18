@@ -21,13 +21,13 @@ import           Data.Text (Text)
 data Formlet
   = Index !Integer
   | Constrained !Text
-  deriving (Show)
+  deriving (Show,Eq)
 
 -- | State used when running a formlet.
 data FormletState =
   FormletState {formletMap :: (Map Integer Text)
                ,formletIndex :: !Integer}
-  deriving (Show)
+  deriving (Show,Eq)
 
 -- | Consume any character.
 indexed :: Consumer FormletState Formlet Text
@@ -35,8 +35,8 @@ indexed =
   consumer (\(nextIndex -> (i,s)) -> (d i,s))
            (\(nextIndex -> (i,s)) ->
               case M.lookup i (formletMap s) of
-                Nothing -> (Left (d i),s)
-                Just a -> (Right a,s))
+                Nothing -> (Failed (d i),s)
+                Just a -> (Succeeded a,s))
   where d = Unit . Index
         nextIndex s =
           (formletIndex s,s {formletIndex = formletIndex s + 1})

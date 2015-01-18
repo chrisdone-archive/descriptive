@@ -32,7 +32,7 @@ data Doc
   | Text !Text
   | Struct !Text
   | Key !Text
-  deriving (Show)
+  deriving (Show,Eq)
 
 -- | Consume an object.
 obj :: Text -- ^ Description of what the object is.
@@ -42,11 +42,12 @@ obj desc =
   wrap (\v d -> (Wrap doc (fst (d mempty)),v))
        (\v _ p ->
           case fromJSON v of
-            Error{} -> (Left (Unit doc),v)
+            Error{} -> (Failed (Unit doc),v)
             Success o ->
               (case p o of
-                 (Left e,_) -> Left (Wrap doc e)
-                 (Right a,_) -> Right a
+                 (Failed e,_) -> Failed (Wrap doc e)
+                 (Continued e,_) -> Failed (Wrap doc e)
+                 (Succeeded a,_) -> Succeeded a
               ,toJSON o))
   where doc = Struct desc
 
@@ -62,7 +63,7 @@ key k =
        (\o _ p ->
           case parseMaybe (const (o .: k))
                           () of
-            Nothing -> (Left (Unit doc),o)
+            Nothing -> (Failed (Unit doc),o)
             Just (v :: Value) ->
               first (bimap (Wrap doc) id)
                     (second (const o)
@@ -76,8 +77,8 @@ string doc =
   consumer (d,)
            (\s ->
               case fromJSON s of
-                Error{} -> (Left d,s)
-                Success a -> (Right a,s))
+                Error{} -> (Failed d,s)
+                Success a -> (Succeeded a,s))
   where d = Unit (Text doc)
 
 -- | Consume an integer.
@@ -87,6 +88,6 @@ integer doc =
   consumer (d,)
            (\s ->
               case fromJSON s of
-                Error{} -> (Left d,s)
-                Success a -> (Right a,s))
+                Error{} -> (Failed d,s)
+                Success a -> (Succeeded a,s))
   where d = Unit (Integer doc)

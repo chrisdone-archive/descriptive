@@ -23,7 +23,7 @@ import           Data.Text (Text)
 data Form
   = Input !Text
   | Constraint !Text
-  deriving (Show)
+  deriving (Show,Eq)
 
 -- | Consume any input value.
 input :: Text -> Consumer (Map Text Text) Form Text
@@ -31,8 +31,8 @@ input name =
   consumer (d,)
            (\s ->
               (case M.lookup name s of
-                 Nothing -> Left d
-                 Just a -> Right a
+                 Nothing -> Continued d
+                 Just a -> Succeeded a
               ,s))
   where d = Unit (Input name)
 
@@ -45,10 +45,12 @@ validate d' check =
   wrap (\s d -> redescribe (d s))
        (\s d p ->
           case p s of
-            (Left e,s') -> (Left e,s')
-            (Right a,s') ->
+            (Failed e,s') -> (Failed e,s')
+            (Continued e,s') -> (Continued (wrapper e),s')
+            (Succeeded a,s') ->
               case check a of
                 Nothing ->
-                  (Left (fst (redescribe (d s))),s')
-                Just a' -> (Right a',s'))
-  where redescribe = first (Wrap (Constraint d'))
+                  (Continued (fst (redescribe (d s))),s')
+                Just a' -> (Succeeded a',s'))
+  where redescribe = first wrapper
+        wrapper = Wrap (Constraint d')

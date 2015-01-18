@@ -1,5 +1,5 @@
 name:                descriptive
-version:             0.0.2
+version:             0.1.0
 synopsis:            Self-describing consumers/parsers; forms, cmd-line args, JSON, etc.
 description:         Self-describing consumers/parsers. See the README.md for more information. It is currently EXPERIMENTAL.
 stability:           Experimental
@@ -12,7 +12,7 @@ copyright:           2015 Chris Done
 category:            Parsing
 build-type:          Simple
 cabal-version:       >=1.8
-extra-source-files:  README.md
+extra-source-files:  README.md, CHANGELOG
 
 library
   hs-source-dirs:    src/
@@ -25,3 +25,12 @@ library
                      Descriptive.JSON
   build-depends:     base >= 4 && <5,
                      transformers, containers, text, mtl, aeson, bifunctors
+
+test-suite test
+    type: exitcode-stdio-1.0
+    main-is: Main.hs
+    hs-source-dirs: src/test
+    build-depends: base,
+                   descriptive, transformers, containers, text, mtl, aeson, bifunctors,
+                   HUnit,
+                   hspec

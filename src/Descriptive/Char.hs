@@ -17,8 +17,8 @@ anyChar =
   consumer (d,)
            (\s ->
               case s of
-                (c':cs') -> (Right c',cs')
-                [] -> (Left d,s))
+                (c':cs') -> (Succeeded c',cs')
+                [] -> (Failed d,s))
   where d = Unit "a character"
 
 -- | A character consumer.
@@ -28,10 +28,11 @@ char c =
         (d,))
        (\s _ p ->
           case p s of
-            (Left e,s') -> (Left e,s')
-            (Right c',s')
-              | c' == c -> (Right c,s')
-              | otherwise -> (Left d,s'))
+            (Failed e,s') -> (Failed e,s')
+            (Continued e,s') -> (Continued e,s')
+            (Succeeded c',s')
+              | c' == c -> (Succeeded c,s')
+              | otherwise -> (Failed d,s'))
        anyChar
   where d = Unit (T.singleton c)
 

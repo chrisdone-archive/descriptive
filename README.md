@@ -24,7 +24,7 @@ To make a consumer, this combinator is used:
 
 ``` haskell
 consumer :: (s -> (Description d,s))
-         -> (s -> (Either (Description d) a,s))
+         -> (s -> (Result (Description d) a,s))
          -> Consumer s d a
 ```
 
@@ -37,8 +37,8 @@ state during generation of the description and during parsing.
 To use a consumer or describe what it does, these are used:
 
 ``` haskell
-consume :: Consumer s d a -> s -> (Either (Description d) a,s)
-describe :: Consumer s d a -> s -> (Description d,s)
+consume :: Consumer s d a -> s -> Result (Description d) a
+describe :: Consumer s d a -> s -> Description d
 ```
 
 A description is like this:
@@ -61,9 +61,9 @@ commandline `--help` screen, a man page, API docs for your JSON
 parser, a text parsing grammar, etc. For example:
 
 ``` haskell
-describeParser :: Consumer [Char] Text Demo -> Text
-describeForm :: Consumer (Map Text Text) (Html ()) Login -> Html ()
-describeArgs :: Consumer [Text] CmdArgs MyApp -> CmdArgs
+describeParser :: Description Text -> Text
+describeForm :: Description (Html ()) -> Html ()
+describeArgs :: Description CmdArgs -> Text
 ```
 
 See below for some examples of this library.
@@ -78,11 +78,11 @@ See `Descriptive.Char`.
      (Sequence [Unit "a",Sequence [Unit "b",Sequence [Unit "c",Sequence []]]])
 ,"")
 λ> consume (many (char 'k') <> string "abc") "kkkabc"
-(Right "kkkabc","")
+(Succeeded "kkkabc")
 λ> consume (many (char 'k') <> string "abc") "kkkab"
-(Left (Unit "a character"),"")
+(Failed (Unit "a character"))
 λ> consume (many (char 'k') <> string "abc") "kkkabj"
-(Left (Unit "c"),"")
+(Failed (Unit "c"))
 ```
 
 ## Validating forms with named inputs
@@ -97,32 +97,35 @@ See `Descriptive.Form`.
             input "username" <*>
             input "password")
            (M.fromList [("username","chrisdone"),("password","god")])
-(Right ("chrisdone","god")
+(Succeeded ("chrisdone","god")
 ,fromList [("password","god"),("username","chrisdone")])
 ```
 
 Conditions on two inputs:
 
 ``` haskell
-login = validate "confirmed password (entered the same twice)"
-                 (\(x,y) ->
-                    if x == y
-                       then Just y
-                       else Nothing)
-                 ((,) <$>
-                  input "password" <*>
-                  input "password2")
+login =
+  validate "confirmed password (entered the same twice)"
+           (\(x,y) ->
+              if x == y
+                 then Just y
+                 else Nothing)
+           ((,) <$>
+            input "password" <*>
+            input "password2") <|>
+  input "token"
 ```
 
 ``` haskell
-λ> describe login mempty
-(Wrap (Constraint "confirmed password (entered the same twice)")
-      (And (Unit (Input "password"))
-           (Unit (Input "password2")))
-,fromList [])
-
 λ> consume login (M.fromList [("password2","gob"),("password","gob")])
-(Right "gob",fromList [("password","gob"),("password2","gob")])
+Succeeded "gob"
+λ> consume login (M.fromList [("password2","gob"),("password","go")])
+Continued (And (Wrap (Constraint "confirmed password (entered the same twice)")
+                     (And (Unit (Input "password"))
+                          (Unit (Input "password2"))))
+               (Unit (Input "token")))
+λ> consume login (M.fromList [("password2","gob"),("password","go"),("token","woot")])
+Succeeded "woot"
 ```
 
 ## Validating forms with auto-generated input indexes
@@ -132,22 +135,15 @@ See `Descriptive.Formlet`.
 ``` haskell
 λ> describe ((,) <$> indexed <*> indexed)
             (FormletState mempty 0)
-(And (Unit (Index 0))
-     (Unit (Index 1))
-,FormletState {formletMap = fromList []
+And (Unit (Index 0))
+    (Unit (Index 1))
               ,formletIndex = 2})
 λ> consume ((,) <$> indexed <*> indexed)
            (FormletState (M.fromList [(0,"chrisdone"),(1,"god")]) 0)
-(Right ("chrisdone","god")
-,FormletState {formletMap =
-                 fromList [(0,"chrisdone"),(1,"god")]
-              ,formletIndex = 2})
+Succeeded ("chrisdone","god")
 λ> consume ((,) <$> indexed <*> indexed)
            (FormletState (M.fromList [(0,"chrisdone")]) 0)
-(Left (Unit (Index 1))
-,FormletState {formletMap =
-                 fromList [(0,"chrisdone")]
-              ,formletIndex = 2})
+Failed (Unit (Index 1))
 ```
 
 ## Parsing command-line options
@@ -165,17 +161,15 @@ server =
 
 ``` haskell
 λ> describe server []
-(And (And (And (Unit (Constant "start"))
+And (And (And (Unit (Constant "start"))
                (Unit (AnyString "SERVER_NAME")))
           (Unit (Flag "dev" "Enable dev mode?")))
      (Unit (Arg "port" "Port to listen on"))
-,[])
-λ> consume server ["start","any","--port","1234","-fdev"]
-(Right ("start","any",True,"1234"),[])
+λ> consume server ["start","any","--port","1234","--dev"]
+Succeeded ("start","any",True,"1234")
 λ> consume server ["start","any","--port","1234"]
-(Right ("start","any",False,"1234"),[])
-λ> consume server ["start","any"]
-(Left (Unit (Arg "port" "Port to listen on")),[])
+Succeeded ("start","any",False,"1234")
+λ>
 ```
 
 ## Self-documenting JSON parser
@@ -219,7 +213,7 @@ badsample =
 
 ``` haskell
 λ> describe submission (toJSON ())
-(Wrap (Struct "Submission")
+Wrap (Struct "Submission")
       (And (And (And (Wrap (Key "token")
                            (Unit (Integer "Submission token; see the API docs")))
                      (Wrap (Key "title")
@@ -228,26 +222,17 @@ badsample =
                       (Unit (Text "Submission comment"))))
            (Wrap (Key "subreddit")
                  (Unit (Integer "The ID of the subreddit"))))
-,Array (fromList []))
+
 
 λ> consume submission sample
-(Right (Submission {submissionToken = 123
+Succeeded (Submission {submissionToken = 123
                    ,submissionTitle = "Some title"
                    ,submissionComment = "This is good"
                    ,submissionSubreddit = 234214})
-,Object (fromList [("token",Number 123.0)
-                  ,("subreddit",Number 234214.0)
-                  ,("title",String "Some title")
-                  ,("comment",String "This is good")]))
-
 λ> consume submission badsample
-(Left (Wrap (Struct "Submission")
+Failed (Wrap (Struct "Submission")
             (Wrap (Key "comment")
                   (Unit (Text "Submission comment"))))
-,Object (fromList [("token",Number 123.0)
-                  ,("subreddit",Number 234214.0)
-                  ,("title",String "Some title")
-                  ,("comment",Number 123.0)]))
 ```
 
 The bad sample yields an informative message that:
@@ -266,7 +251,7 @@ With ACE you can parse into:
 
 ``` haskell
 parsed complV "<distrans-verb> a <noun> <prep> a <noun>" ==
-Right (ComplVDisV (DistransitiveV "<distrans-verb>")
+Succeeded (ComplVDisV (DistransitiveV "<distrans-verb>")
                   (ComplNP (NPCoordUnmarked (UnmarkedNPCoord anoun Nothing)))
                   (ComplPP (PP (Preposition "<prep>")
                                (NPCoordUnmarked (UnmarkedNPCoord anoun Nothing)))))
