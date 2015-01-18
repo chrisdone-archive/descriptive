@@ -172,6 +172,11 @@ Succeeded ("start","any",False,"1234")
 λ>
 ```
 
+``` haskell
+λ> textDescription (describe server [])
+"start SERVER_NAME [--dev] --port <...>"
+```
+
 ## Self-documenting JSON parser
 
 See `Descriptive.JSON`.
