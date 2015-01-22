@@ -140,16 +140,16 @@ options =
              (Unit (Options.Arg "port" "Port to listen on")))
      it "succeeding options"
         (consume server ["start","any","--port","1234","--dev"] ==
-         Succeeded ("start","any",True,"1234"))
+         Succeeded ((),"any",True,"1234"))
      it "succeeding omitting port options"
         (consume server ["start","any","--port","1234"] ==
-         Succeeded ("start","any",False,"1234"))
+         Succeeded ((),"any",False,"1234"))
      it "failing options"
         (consume server ["start","any"] ==
          Failed (Unit (Options.Arg "port" "Port to listen on")))
   where server =
           ((,,,) <$>
-           Options.constant "start" "cmd" <*>
+           Options.constant "start" "cmd" () <*>
            Options.anyString "SERVER_NAME" <*>
            Options.switch "dev" "Enable dev mode?" <*>
            Options.arg "port" "Port to listen on")
