@@ -6,13 +6,17 @@
 -- | Command-line options parser.
 
 module Descriptive.Options
-  (-- * Combinators
-   anyString
-  ,constant
-  ,flag
+  (-- * Existence flags
+   flag
   ,switch
+  -- * Text input arguments
   ,prefix
   ,arg
+   -- * Token consumers
+   -- $tokens
+  ,anyString
+  ,constant
+  -- * Special control
   ,stop
   -- * Description
   ,Option(..)
@@ -42,7 +46,7 @@ data Option a
   deriving (Show,Eq)
 
 -- | If the consumer succeeds, stops the whole parser and returns
--- immediately.
+-- 'Stopped' immediately.
 stop :: Consumer [Text] (Option a) a
      -- ^ A parser which, when it succeeds, causes the whole parser to stop.
      -> Consumer [Text] (Option a) ()
@@ -72,20 +76,22 @@ anyString help =
   where d = Unit (AnyString help)
 
 -- | Consume one argument from the argument list which must match the
--- given string.
+-- given string, and also pops it off the argument list.
 constant :: Text -- ^ String.
          -> Text -- ^ Description.
-         -> Consumer [Text] (Option a) Text
-constant x' desc =
+         -> v
+         -> Consumer [Text] (Option a) v
+constant x' desc v =
   consumer (d,)
            (\s ->
               case s of
                 (x:s') | x == x' ->
-                  (Succeeded x,s')
+                  (Succeeded v,s')
                 _ -> (Failed d,s))
   where d = Unit (Constant x' desc)
 
--- | Find a value flag which must succeed.
+-- | Find a value flag which must succeed. Removes it from the
+-- argument list if it succeeds.
 flag :: Text -- ^ Name.
      -> Text -- ^ Description.
      -> v    -- ^ Value returned when present.
@@ -99,7 +105,8 @@ flag name help v =
               )
   where d = Unit (Flag name help)
 
--- | Find a boolean flag. Always succeeds. Omission counts as 'False'.
+-- | Find a boolean flag. Always succeeds. Omission counts as
+-- 'False'. Removes it from the argument list if it returns True.
 switch :: Text -- ^ Name.
        -> Text -- ^ Description.
        -> Consumer [Text] (Option a) Bool
@@ -107,7 +114,8 @@ switch name help =
   flag name help True <|>
   pure False
 
--- | Find an argument prefixed by -X.
+-- | Find an argument prefixed by -X. Removes it from the argument
+-- list when it succeeds.
 prefix :: Text -- ^ Prefix string.
        -> Text -- ^ Description.
        -> Consumer [Text] (Option a) Text
@@ -119,7 +127,8 @@ prefix pref help =
                 Just a -> (Succeeded (T.drop (T.length pref + 1) a), delete a s))
   where d = Unit (Prefix pref help)
 
--- | Find a named argument e.g. @--name value@.
+-- | Find a named argument e.g. @--name value@. Removes it from the
+-- argument list when it succeeds.
 arg :: Text -- ^ Name.
     -> Text -- ^ Description.
     -> Consumer [Text] (Option a) Text
