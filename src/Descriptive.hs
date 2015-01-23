@@ -95,6 +95,26 @@ data Result e a
   | Continued e -- ^ There were errors but we continued to collect all the errors.
   deriving (Show,Eq,Ord)
 
+--
+-- first id ≡ \r -> case r of
+--               Succeeded a -> Succeeded a
+--               Failed e -> Failed (id e)
+--               Continued e -> Continued (id e)
+--          ≡ \r -> case r of
+--               Succeeded a -> Succeeded a
+--               Failed e -> Failed e
+--               Continued e -> Continued e
+--          ≡ id
+--
+-- second id ≡ \r -> case r of
+--                      Succeeded a -> Succeeded (id a)
+--                      Failed e -> Failed e
+--                      Continued e -> Continued e
+--           ≡ \r -> case r of
+--                      Succeeded a -> Succeeded a
+--                      Failed e -> Failed e
+--                      Continued e -> Continued e
+--           ≡ id
 instance Bifunctor Result where
   second f r =
     case r of
@@ -106,6 +126,184 @@ instance Bifunctor Result where
       Succeeded a -> Succeeded a
       Failed e -> Failed (f e)
       Continued e -> Continued (f e)
+
+-- fmap id ≡ \(Consumer d p) ->
+--              Consumer d
+--               (\s ->
+--                  case p s of
+--                    (Failed e,s') -> (Failed e,s')
+--                    (Continued e,s') -> (Continued e,s')
+--                    (Succeeded a,s') -> (Succeeded (id a),s'))
+--         ≡ \(Consumer d p) ->
+--              Consumer d
+--               (\s ->
+--                  case p s of
+--                    (Failed e,s') -> (Failed e,s')
+--                    (Continued e,s') -> (Continued e,s')
+--                    (Succeeded a,s') -> (Succeeded a,s'))
+--         ≡ \(Consumer d p) ->
+--              Consumer d
+--               (\s -> p s)
+--         ≡ \(Consumer d p) ->
+--              Consumer d p
+--         ≡ id
+--
+-- fmap (f . g) ≡ fmap f . fmap g
+--
+-- proof_0 f g =
+--   (\(Consumer d p) ->
+--      Consumer d
+--               (\s ->
+--                  case p s of
+--                    (Failed e,s') -> (Failed e,s')
+--                    (Continued e,s') ->
+--                      (Continued e,s')
+--                    (Succeeded a,s') ->
+--                      (Succeeded ((f . g) a),s'))) ≡
+--   ((\(Consumer d p) ->
+--       Consumer d
+--                (\s ->
+--                   case p s of
+--                     (Failed e,s') ->
+--                       (Failed e,s')
+--                     (Continued e,s') ->
+--                       (Continued e,s')
+--                     (Succeeded a,s') ->
+--                       (Succeeded (f a),s'))) .
+--    (\(Consumer d p) ->
+--       Consumer d
+--                (\s ->
+--                   case p s of
+--                     (Failed e,s') ->
+--                       (Failed e,s')
+--                     (Continued e,s') ->
+--                       (Continued e,s')
+--                     (Succeeded a,s') ->
+--                       (Succeeded (g a),s'))))
+-- proof_1 f g =
+--   (\(Consumer d p) ->
+--      Consumer d
+--               (\s ->
+--                  case p s of
+--                    (Succeeded a,s') ->
+--                      (Succeeded ((f . g) a),s')
+--                    w -> w)) ≡
+--   ((\(Consumer d p) ->
+--       Consumer d
+--                (\s ->
+--                   case p s of
+--                     (Succeeded a,s') ->
+--                       (Succeeded (f a),s')
+--                     w -> w)) .
+--    (\(Consumer d p) ->
+--       Consumer d
+--                (\s ->
+--                   case p s of
+--                     (Succeeded a,s') ->
+--                       (Succeeded (g a),s')
+--                     w -> w)))
+
+-- proof_2 f g =
+--   (\(Consumer d p) ->
+--      Consumer d
+--               (\s ->
+--                  case p s of
+--                    (Succeeded a,s') ->
+--                      (Succeeded ((f . g) a),s')
+--                    w -> w)) ≡
+--   (\(Consumer d p) ->
+--      case Consumer d
+--                    (\s ->
+--                       case p s of
+--                         (Succeeded a,s') ->
+--                           (Succeeded (f a),s')
+--                         w -> w) of
+--        (Consumer d p) ->
+--          Consumer d
+--                   (\s ->
+--                      case p s of
+--                        (Succeeded a,s') ->
+--                          (Succeeded (g a),s')
+--                        w -> w))
+
+-- proof_3 f g =
+--   (\(Consumer d p) ->
+--      Consumer d
+--               (\s ->
+--                  case p s of
+--                    (Succeeded a,s') ->
+--                      (Succeeded ((f . g) a),s')
+--                    w -> w)) ≡
+--   (\(Consumer d p) ->
+--      Consumer d
+--               (\s ->
+--                  case p s of
+--                    (Succeeded a,s') ->
+--                      case (Succeeded (f a),s') of
+--                        (Succeeded a_,s'_) ->
+--                          (Succeeded (g a_),s'_)
+--                        w -> w
+--                    w -> w))
+
+-- proof_4 f g =
+--   (\(Consumer d p) ->
+--      Consumer d
+--               (\s ->
+--                  case p s of
+--                    (Succeeded a,s') ->
+--                      (Succeeded ((f . g) a),s')
+--                    w -> w)) ≡
+--   (\(Consumer d p) ->
+--      Consumer d
+--               (\s ->
+--                  case p s of
+--                    (x,s') ->
+--                      (case x of
+--                         Succeeded a ->
+--                           case Succeeded (f a) of
+--                             (Succeeded a') ->
+--                               (Succeeded (g a'))
+--                             w -> w
+--                         w -> w
+--                      ,s')
+--                    w -> w))
+
+-- proof_4 f g =
+--   (\(Consumer d p) ->
+--      Consumer d
+--               (\s ->
+--                  case p s of
+--                    (Succeeded a,s') ->
+--                      (Succeeded ((f . g) a),s')
+--                    w -> w)) ≡
+--   (\(Consumer d p) ->
+--      Consumer d
+--               (\s ->
+--                  case p s of
+--                    (x,s') ->
+--                      (case x of
+--                         Succeeded a ->
+--                           Succeeded ((f . g) a)
+--                         w -> w
+--                      ,s')
+--                    w -> w))
+
+
+-- proof_5 f g =
+--   (\(Consumer d p) ->
+--      Consumer d
+--               (\s ->
+--                  case p s of
+--                    (Succeeded a,s') ->
+--                      (Succeeded ((f . g) a),s')
+--                    w -> w)) ≡
+--   (\(Consumer d p) ->
+--      Consumer d
+--               (\s ->
+--                  case p s of
+--                    (Succeeded a,s') ->
+--                      (Succeeded ((f . g) a),s')
+--                    w -> w))
 
 instance Functor (Consumer s d) where
   fmap f (Consumer d p) =
