@@ -163,282 +163,276 @@ instance Functor (Consumer s d) where
 
 -- identity
 -- pure id <*> v = v
-applicative_identity v =
-  (pure id <*> v) ≡
-  v
-applicative_identity v =
-  (Consumer (\s -> (mempty,s))
-            (\s -> (Succeeded id,s)) <*>
-   v) ≡
-  v
-applicative_identity v =
-  (\(Consumer d pf) (Consumer d' p') ->
-     Consumer (\s ->
-                 let !(e,s') = d s
-                     !(e',s'') = d' s'
-                 in (e <> e',s''))
-              (\s ->
-                 let !(mf,s') = pf s
-                     !(ma,s'') = p' s'
-                 in case mf of
-                      Failed e -> (Failed e,s')
-                      Continued e ->
-                        case ma of
-                          Failed e' ->
-                            (Failed e',s'')
-                          Continued e' ->
-                            (Continued (e <> e'),s'')
-                          Succeeded _ ->
-                            (Continued e,s'')
-                      Succeeded f ->
-                        case ma of
-                          Continued e ->
-                            (Continued e,s'')
-                          Failed e ->
-                            (Failed e,s'')
-                          Succeeded a ->
-                            (Succeeded (f a),s'')))
-    (Consumer (\s -> (mempty,s))
-              (\s -> (Succeeded id,s)))
-    v ≡
-  v
-applicative_identity v =
-  (\(Consumer d pf) (Consumer d' p') ->
-     Consumer (\s ->
-                 let !(e,s') = (\s -> (mempty,s)) s
-                     !(e',s'') = d' s'
-                 in (e <> e',s''))
-              (\s ->
-                 let !(mf,s') = pf s
-                     !(ma,s'') = p' s'
-                 in case mf of
-                      Failed e -> (Failed e,s')
-                      Continued e ->
-                        case ma of
-                          Failed e' ->
-                            (Failed e',s'')
-                          Continued e' ->
-                            (Continued (e <> e'),s'')
-                          Succeeded _ ->
-                            (Continued e,s'')
-                      Succeeded f ->
-                        case ma of
-                          Continued e ->
-                            (Continued e,s'')
-                          Failed e ->
-                            (Failed e,s'')
-                          Succeeded a ->
-                            (Succeeded (f a),s'')))
-    (Consumer (\s -> (mempty,s))
-              (\s -> (Succeeded id,s)))
-    v ≡
-  v
+-- applicative_identity v =
+--   (pure id <*> v) ≡
+--   v
+-- applicative_identity v =
+--   (Consumer (\s -> (mempty,s))
+--             (\s -> (Succeeded id,s)) <*>
+--    v) ≡
+--   v
+-- applicative_identity v =
+--   (\(Consumer d pf) (Consumer d' p') ->
+--      Consumer (\s ->
+--                  let !(e,s') = d s
+--                      !(e',s'') = d' s'
+--                  in (e <> e',s''))
+--               (\s ->
+--                  let !(mf,s') = pf s
+--                      !(ma,s'') = p' s'
+--                  in case mf of
+--                       Failed e -> (Failed e,s')
+--                       Continued e ->
+--                         case ma of
+--                           Failed e' ->
+--                             (Failed e',s'')
+--                           Continued e' ->
+--                             (Continued (e <> e'),s'')
+--                           Succeeded _ ->
+--                             (Continued e,s'')
+--                       Succeeded f ->
+--                         case ma of
+--                           Continued e ->
+--                             (Continued e,s'')
+--                           Failed e ->
+--                             (Failed e,s'')
+--                           Succeeded a ->
+--                             (Succeeded (f a),s'')))
+--     (Consumer (\s -> (mempty,s))
+--               (\s -> (Succeeded id,s)))
+--     v ≡
+--   v
+-- applicative_identity v =
+--   (\(Consumer d pf) (Consumer d' p') ->
+--      Consumer (\s ->
+--                  let !(e,s') = (\s -> (mempty,s)) s
+--                      !(e',s'') = d' s'
+--                  in (e <> e',s''))
+--               (\s ->
+--                  let !(mf,s') = pf s
+--                      !(ma,s'') = p' s'
+--                  in case mf of
+--                       Failed e -> (Failed e,s')
+--                       Continued e ->
+--                         case ma of
+--                           Failed e' ->
+--                             (Failed e',s'')
+--                           Continued e' ->
+--                             (Continued (e <> e'),s'')
+--                           Succeeded _ ->
+--                             (Continued e,s'')
+--                       Succeeded f ->
+--                         case ma of
+--                           Continued e ->
+--                             (Continued e,s'')
+--                           Failed e ->
+--                             (Failed e,s'')
+--                           Succeeded a ->
+--                             (Succeeded (f a),s'')))
+--     (Consumer (\s -> (mempty,s))
+--               (\s -> (Succeeded id,s)))
+--     v ≡
+--   v
 
-applicative_identity v =
-  (\(Consumer d pf) (Consumer d' p') ->
-     Consumer (\s ->
-                 let !(e,s') = (mempty,s)
-                     !(e',s'') = d' s'
-                 in (e <> e',s''))
-              (\s ->
-                 let !(mf,s') = pf s
-                     !(ma,s'') = p' s'
-                 in case mf of
-                      Failed e -> (Failed e,s')
-                      Continued e ->
-                        case ma of
-                          Failed e' ->
-                            (Failed e',s'')
-                          Continued e' ->
-                            (Continued (e <> e'),s'')
-                          Succeeded _ ->
-                            (Continued e,s'')
-                      Succeeded f ->
-                        case ma of
-                          Continued e ->
-                            (Continued e,s'')
-                          Failed e ->
-                            (Failed e,s'')
-                          Succeeded a ->
-                            (Succeeded (f a),s'')))
-    (Consumer (\s -> (mempty,s))
-              (\s -> (Succeeded id,s)))
-    v ≡
-  v
+-- applicative_identity v =
+--   (\(Consumer d pf) (Consumer d' p') ->
+--      Consumer (\s ->
+--                  let !(e,s') = (mempty,s)
+--                      !(e',s'') = d' s'
+--                  in (e <> e',s''))
+--               (\s ->
+--                  let !(mf,s') = pf s
+--                      !(ma,s'') = p' s'
+--                  in case mf of
+--                       Failed e -> (Failed e,s')
+--                       Continued e ->
+--                         case ma of
+--                           Failed e' ->
+--                             (Failed e',s'')
+--                           Continued e' ->
+--                             (Continued (e <> e'),s'')
+--                           Succeeded _ ->
+--                             (Continued e,s'')
+--                       Succeeded f ->
+--                         case ma of
+--                           Continued e ->
+--                             (Continued e,s'')
+--                           Failed e ->
+--                             (Failed e,s'')
+--                           Succeeded a ->
+--                             (Succeeded (f a),s'')))
+--     (Consumer (\s -> (mempty,s))
+--               (\s -> (Succeeded id,s)))
+--     v ≡
+--   v
 
-applicative_identity v =
-  (\(Consumer d pf) (Consumer d' p') ->
-     Consumer (\s ->
-                 let !(e',s'') = d' s
-                 in (mempty <> e',s''))
-              (\s ->
-                 let !(mf,s') = pf s
-                     !(ma,s'') = p' s'
-                 in case mf of
-                      Failed e -> (Failed e,s')
-                      Continued e ->
-                        case ma of
-                          Failed e' ->
-                            (Failed e',s'')
-                          Continued e' ->
-                            (Continued (e <> e'),s'')
-                          Succeeded _ ->
-                            (Continued e,s'')
-                      Succeeded f ->
-                        case ma of
-                          Continued e ->
-                            (Continued e,s'')
-                          Failed e ->
-                            (Failed e,s'')
-                          Succeeded a ->
-                            (Succeeded (f a),s'')))
-    (Consumer (\s -> (mempty,s))
-              (\s -> (Succeeded id,s)))
-    v ≡
-  v
+-- applicative_identity v =
+--   (\(Consumer d pf) (Consumer d' p') ->
+--      Consumer (\s ->
+--                  let !(e',s'') = d' s
+--                  in (mempty <> e',s''))
+--               (\s ->
+--                  let !(mf,s') = pf s
+--                      !(ma,s'') = p' s'
+--                  in case mf of
+--                       Failed e -> (Failed e,s')
+--                       Continued e ->
+--                         case ma of
+--                           Failed e' ->
+--                             (Failed e',s'')
+--                           Continued e' ->
+--                             (Continued (e <> e'),s'')
+--                           Succeeded _ ->
+--                             (Continued e,s'')
+--                       Succeeded f ->
+--                         case ma of
+--                           Continued e ->
+--                             (Continued e,s'')
+--                           Failed e ->
+--                             (Failed e,s'')
+--                           Succeeded a ->
+--                             (Succeeded (f a),s'')))
+--     (Consumer (\s -> (mempty,s))
+--               (\s -> (Succeeded id,s)))
+--     v ≡
+--   v
 
-applicative_identity v =
-  (\(Consumer d pf) (Consumer d' p') ->
-     Consumer (\s ->
-                 let !(e,s') = d' s
-                 in (e,s'))
-              (\s ->
-                 let !(mf,s') = pf s
-                     !(ma,s'') = p' s'
-                 in case mf of
-                      Failed e -> (Failed e,s')
-                      Continued e ->
-                        case ma of
-                          Failed e' ->
-                            (Failed e',s'')
-                          Continued e' ->
-                            (Continued (e <> e'),s'')
-                          Succeeded _ ->
-                            (Continued e,s'')
-                      Succeeded f ->
-                        case ma of
-                          Continued e ->
-                            (Continued e,s'')
-                          Failed e ->
-                            (Failed e,s'')
-                          Succeeded a ->
-                            (Succeeded (f a),s'')))
-    (Consumer (\s -> (mempty,s))
-              (\s -> (Succeeded id,s)))
-    v ≡
-  v
+-- applicative_identity v =
+--   (\(Consumer d pf) (Consumer d' p') ->
+--      Consumer (\s ->
+--                  let !(e,s') = d' s
+--                  in (e,s'))
+--               (\s ->
+--                  let !(mf,s') = pf s
+--                      !(ma,s'') = p' s'
+--                  in case mf of
+--                       Failed e -> (Failed e,s')
+--                       Continued e ->
+--                         case ma of
+--                           Failed e' ->
+--                             (Failed e',s'')
+--                           Continued e' ->
+--                             (Continued (e <> e'),s'')
+--                           Succeeded _ ->
+--                             (Continued e,s'')
+--                       Succeeded f ->
+--                         case ma of
+--                           Continued e ->
+--                             (Continued e,s'')
+--                           Failed e ->
+--                             (Failed e,s'')
+--                           Succeeded a ->
+--                             (Succeeded (f a),s'')))
+--     (Consumer (\s -> (mempty,s))
+--               (\s -> (Succeeded id,s)))
+--     v ≡
+--   v
 
-applicative_identity v =
-  (\(Consumer d pf) (Consumer d' p') ->
-     Consumer (\s -> d' s)
-              (\s ->
-                 let !(mf,s') = pf s
-                     !(ma,s'') = p' s'
-                 in case mf of
-                      Failed e -> (Failed e,s')
-                      Continued e ->
-                        case ma of
-                          Failed e' ->
-                            (Failed e',s'')
-                          Continued e' ->
-                            (Continued (e <> e'),s'')
-                          Succeeded _ ->
-                            (Continued e,s'')
-                      Succeeded f ->
-                        case ma of
-                          Continued e ->
-                            (Continued e,s'')
-                          Failed e ->
-                            (Failed e,s'')
-                          Succeeded a ->
-                            (Succeeded (f a),s'')))
-    (Consumer (\s -> (mempty,s))
-              (\s -> (Succeeded id,s)))
-    v ≡
-  v
+-- applicative_identity v =
+--   (\(Consumer d pf) (Consumer d' p') ->
+--      Consumer (\s -> d' s)
+--               (\s ->
+--                  let !(mf,s') = pf s
+--                      !(ma,s'') = p' s'
+--                  in case mf of
+--                       Failed e -> (Failed e,s')
+--                       Continued e ->
+--                         case ma of
+--                           Failed e' ->
+--                             (Failed e',s'')
+--                           Continued e' ->
+--                             (Continued (e <> e'),s'')
+--                           Succeeded _ ->
+--                             (Continued e,s'')
+--                       Succeeded f ->
+--                         case ma of
+--                           Continued e ->
+--                             (Continued e,s'')
+--                           Failed e ->
+--                             (Failed e,s'')
+--                           Succeeded a ->
+--                             (Succeeded (f a),s'')))
+--     (Consumer (\s -> (mempty,s))
+--               (\s -> (Succeeded id,s)))
+--     v ≡
+--   v
 
-applicative_identity v =
-  (\(Consumer d pf) (Consumer d' p') ->
-     Consumer d'
-              (\s ->
-                 let !(Succeeded f,_) = pf s
-                     !(ma,s') = p' s
-                 in case ma of
-                      Continued e ->
-                        (Continued e,s')
-                      Failed e ->
-                        (Failed e,s')
-                      Succeeded a ->
-                        (Succeeded (f a),s')))
-    (Consumer (\s -> (mempty,s))
-              (\s -> (Succeeded id,s)))
-    v ≡
-  v
+-- applicative_identity v =
+--   (\(Consumer d pf) (Consumer d' p') ->
+--      Consumer d'
+--               (\s ->
+--                  let !(Succeeded f,_) = pf s
+--                      !(ma,s') = p' s
+--                  in case ma of
+--                       Continued e ->
+--                         (Continued e,s')
+--                       Failed e ->
+--                         (Failed e,s')
+--                       Succeeded a ->
+--                         (Succeeded (f a),s')))
+--     (Consumer (\s -> (mempty,s))
+--               (\s -> (Succeeded id,s)))
+--     v ≡
+--   v
 
-applicative_identity v =
-  (\(Consumer d pf) (Consumer d' p') ->
-     Consumer d'
-              (\s ->
-                 let !(Succeeded f,_) = pf s
-                 in case p' s of
-                      (Succeeded a,s') ->
-                        (Succeeded (f a),s')
-                      w -> w))
-    (Consumer (\s -> (mempty,s))
-              (\s -> (Succeeded id,s)))
-    v ≡
-  v
+-- applicative_identity v =
+--   (\(Consumer d pf) (Consumer d' p') ->
+--      Consumer d'
+--               (\s ->
+--                  let !(Succeeded f,_) = pf s
+--                  in case p' s of
+--                       (Succeeded a,s') ->
+--                         (Succeeded (f a),s')
+--                       w -> w))
+--     (Consumer (\s -> (mempty,s))
+--               (\s -> (Succeeded id,s)))
+--     v ≡
+--   v
 
-applicative_identity v =
-  (\(Consumer d pf) (Consumer d' p') ->
-     Consumer d'
-              (\s ->
-                 case p' s of
-                   (Succeeded a,s') ->
-                     (Succeeded (id a),s')
-                   w -> w))
-    (Consumer (\s -> (mempty,s))
-              (\s -> (Succeeded id,s)))
-    v ≡
-  v
+-- applicative_identity v =
+--   (\(Consumer d pf) (Consumer d' p') ->
+--      Consumer d'
+--               (\s ->
+--                  case p' s of
+--                    (Succeeded a,s') ->
+--                      (Succeeded (id a),s')
+--                    w -> w))
+--     (Consumer (\s -> (mempty,s))
+--               (\s -> (Succeeded id,s)))
+--     v ≡
+--   v
 
-applicative_identity v =
-  (\(Consumer d pf) (Consumer d' p') ->
-     Consumer d'
-              (\s ->
-                 case p' s of
-                   (Succeeded a,s') ->
-                     (Succeeded a,s')
-                   w -> w))
-    (Consumer (\s -> (mempty,s))
-              (\s -> (Succeeded id,s)))
-    v ≡
-  v
+-- applicative_identity v =
+--   (\(Consumer d pf) (Consumer d' p') ->
+--      Consumer d'
+--               (\s ->
+--                  case p' s of
+--                    (Succeeded a,s') ->
+--                      (Succeeded a,s')
+--                    w -> w))
+--     (Consumer (\s -> (mempty,s))
+--               (\s -> (Succeeded id,s)))
+--     v ≡
+--   v
 
-applicative_identity v =
-  (\(Consumer d pf) (Consumer d' p') ->
-     Consumer d' p')
-    (Consumer (\s -> (mempty,s))
-              (\s -> (Succeeded id,s)))
-    v ≡
-  v
+-- applicative_identity v =
+--   (\(Consumer d pf) (Consumer d' p') ->
+--      Consumer d' p')
+--     (Consumer (\s -> (mempty,s))
+--               (\s -> (Succeeded id,s)))
+--     v ≡
+--   v
 
-applicative_identity v =
-  (\_ v' -> v')
-    (Consumer (\s -> (mempty,s))
-              (\s -> (Succeeded id,s)))
-    v ≡
-  v
+-- applicative_identity v =
+--   (\_ v' -> v')
+--     (Consumer (\s -> (mempty,s))
+--               (\s -> (Succeeded id,s)))
+--     v ≡
+--   v
 
-applicative_identity v =
-  const (Consumer (\s -> (mempty,s))
-                  (\s -> (Succeeded id,s)))
-        v ≡
-  v
-
-applicative_identity v =
-  v ≡
-  v
+-- applicative_identity v =
+--   v ≡
+--   v
 
 instance Applicative (Consumer s d) where
   pure a =
