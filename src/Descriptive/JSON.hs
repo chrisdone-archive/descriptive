@@ -1,3 +1,4 @@
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE PatternGuards #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -13,6 +14,7 @@ module Descriptive.JSON
   (-- * Combinators
    object
   ,key
+  ,keyMaybe
   ,array
   ,string
   ,integer
@@ -84,6 +86,26 @@ key k =
             Nothing -> (Failed (Unit doc),o)
             Just (v :: Value) ->
               first (bimap (Wrap doc) id)
+                    (second (const o)
+                            (p v)))
+  where doc = Key k
+
+-- | Optionally consume from object at the given key, only if it
+-- exists.
+keyMaybe :: Text -- ^ The key to lookup.
+         -> Consumer Value Doc a -- ^ A value consumer of the object at the key.
+         -> Consumer Object Doc (Maybe a)
+keyMaybe k =
+  wrap (\o d ->
+          first (Wrap doc)
+                (second (const o)
+                        (d (toJSON o))))
+       (\o _ p ->
+          case parseMaybe (const (o .: k))
+                          () of
+            Nothing -> (Succeeded Nothing,o)
+            Just (v :: Value) ->
+              first (bimap (Wrap doc) Just)
                     (second (const o)
                             (p v)))
   where doc = Key k
