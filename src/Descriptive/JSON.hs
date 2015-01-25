@@ -1,3 +1,4 @@
+{-# LANGUAGE PatternGuards #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections #-}
@@ -12,28 +13,43 @@ module Descriptive.JSON
   (-- * Combinators
    object
   ,key
+  ,array
   ,string
   ,integer
+  ,double
+  ,bool
+  ,null
   -- * Description
   ,Doc(..)
   )
   where
 
-import Descriptive
+import           Data.Scientific
+import           Descriptive
 
-import Data.Aeson hiding (Value(Object),object)
-import Data.Aeson.Types (Value,parseMaybe)
-import Data.Bifunctor
-import Data.Data
-import Data.Monoid
-import Data.Text (Text)
+import           Data.Function
+import           Data.Aeson hiding (Value(Object,Null,Array),object)
+import           Data.Aeson.Types (Value,parseMaybe)
+import qualified Data.Aeson.Types as Aeson
+import           Data.Bifunctor
+import           Data.Data
+import           Data.Monoid
+import           Data.Text (Text)
+import           Data.Vector ((!))
+import           Data.Vector (Vector)
+import qualified Data.Vector as V
+import           Prelude hiding (null)
 
 -- | Description of parseable things.
 data Doc
   = Integer !Text
+  | Double !Text
   | Text !Text
+  | Boolean !Text
+  | Null !Text
   | Object !Text
   | Key !Text
+  | Array !Text
   deriving (Eq,Show,Typeable,Data)
 
 -- | Consume an object.
@@ -72,6 +88,29 @@ key k =
                             (p v)))
   where doc = Key k
 
+-- | Consume an array.
+array :: Text -> Consumer Value Doc a -> Consumer Value Doc (Vector a)
+array desc =
+  wrap (\v d -> (Wrap doc (fst (d Aeson.Null)),v))
+       (\v _ p ->
+          case fromJSON v of
+            Error{} -> (Failed (Unit doc),v)
+            Success (o :: Vector Value) ->
+              (fix (\loop i acc ->
+                      if i < V.length o - 1
+                         then case p (o ! i) of
+                                (Failed e,_) ->
+                                  Failed (Wrap doc e)
+                                (Continued e,_) ->
+                                  Failed (Wrap doc e)
+                                (Succeeded a,_) ->
+                                  loop (i + 1) (a : acc)
+                         else Succeeded (V.fromList (reverse acc)))
+                   0
+                   []
+              ,v))
+  where doc = Array desc
+
 -- | Consume a string.
 string :: Text -- ^ Description of what the string is for.
        -> Consumer Value Doc Text
@@ -89,7 +128,43 @@ integer :: Text -- ^ Description of what the integer is for.
 integer doc =
   consumer (d,)
            (\s ->
+              case s of
+                Number a
+                  | Right i <- floatingOrInteger a ->
+                    (Succeeded i,s)
+                _ -> (Failed d,s))
+  where d = Unit (Integer doc)
+
+-- | Consume an double.
+double :: Text -- ^ Description of what the double is for.
+        -> Consumer Value Doc Double
+double doc =
+  consumer (d,)
+           (\s ->
+              case s of
+                Number a ->
+                  (Succeeded (toRealFloat a),s)
+                _ -> (Failed d,s))
+  where d = Unit (Double doc)
+
+-- | Parse a boolean.
+bool :: Text -- ^ Description of what the bool is for.
+     -> Consumer Value Doc Bool
+bool doc =
+  consumer (d,)
+           (\s ->
               case fromJSON s of
                 Error{} -> (Failed d,s)
                 Success a -> (Succeeded a,s))
-  where d = Unit (Integer doc)
+  where d = Unit (Boolean doc)
+
+-- | Expect null.
+null :: Text -- ^ What the null is for.
+       -> Consumer Value Doc ()
+null doc =
+  consumer (d,)
+           (\s ->
+              case fromJSON s of
+                Success Aeson.Null -> (Succeeded (),s)
+                _ -> (Failed d,s))
+  where d = Unit (Null doc)

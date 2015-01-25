@@ -23,8 +23,14 @@ library
                      Descriptive.Formlet
                      Descriptive.Options
                      Descriptive.JSON
-  build-depends:     base >= 4 && <5,
-                     transformers, containers, text, mtl, aeson, bifunctors
+  build-depends:     aeson
+                   , base >= 4 && <5
+                   , bifunctors
+                   , containers
+                   , mtl
+                   , scientific
+                   , text
+                   , transformers
 
 test-suite test
     type: exitcode-stdio-1.0
