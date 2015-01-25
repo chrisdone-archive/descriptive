@@ -21,6 +21,7 @@ module Descriptive.JSON
   ,double
   ,bool
   ,null
+  ,label
   -- * Description
   ,Doc(..)
   )
@@ -52,6 +53,7 @@ data Doc
   | Object !Text
   | Key !Text
   | Array !Text
+  | Label !Text
   deriving (Eq,Show,Typeable,Data)
 
 -- | Consume an object.
@@ -190,3 +192,12 @@ null doc =
                 Success Aeson.Null -> (Succeeded (),s)
                 _ -> (Failed d,s))
   where d = Unit (Null doc)
+
+-- | Wrap a consumer with a label containing additional description.
+label :: Text -- ^ Some label.
+      -> Consumer s Doc a -- ^ An object consumer.
+      -> Consumer s Doc a
+label desc =
+  wrap (\s d -> (Wrap doc (fst (d s)),s))
+       (\s _ p -> p s)
+  where doc = Label desc
