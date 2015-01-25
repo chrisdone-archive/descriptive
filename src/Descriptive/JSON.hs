@@ -11,7 +11,7 @@
 -- | A JSON API which describes itself.
 
 module Descriptive.JSON
-  (-- * Combinators
+  (-- * Consumers
    object
   ,key
   ,keyMaybe
@@ -21,7 +21,9 @@ module Descriptive.JSON
   ,double
   ,bool
   ,null
+  -- * Annotations
   ,label
+  ,info
   -- * Description
   ,Doc(..)
   )
@@ -54,6 +56,7 @@ data Doc
   | Key !Text
   | Array !Text
   | Label !Text
+  | Info !Text
   deriving (Eq,Show,Typeable,Data)
 
 -- | Consume an object.
@@ -195,11 +198,20 @@ null doc =
                 _ -> (Failed d,s))
   where d = Unit (Null doc)
 
--- | Wrap a consumer with a label containing additional description.
-label :: Text -- ^ Some label.
-      -> Consumer s Doc a -- ^ An object consumer.
+-- | Wrap a consumer with a label e.g. a type tag.
+label :: Text             -- ^ Some label.
+      -> Consumer s Doc a -- ^ A value consumer.
       -> Consumer s Doc a
 label desc =
   wrap (\s d -> (Wrap doc (fst (d s)),s))
        (\s _ p -> p s)
   where doc = Label desc
+
+-- | Wrap a consumer with some handy information.
+info :: Text             -- ^ Some information.
+     -> Consumer s Doc a -- ^ A value consumer.
+     -> Consumer s Doc a
+info desc =
+  wrap (\s d -> (Wrap doc (fst (d s)),s))
+       (\s _ p -> p s)
+  where doc = Info desc
