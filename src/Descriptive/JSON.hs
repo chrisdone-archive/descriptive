@@ -113,7 +113,9 @@ keyMaybe k =
   where doc = Key k
 
 -- | Consume an array.
-array :: Text -> Consumer Value Doc a -> Consumer Value Doc (Vector a)
+array :: Text -- ^ Description of this array.
+      -> Consumer Value Doc a -- ^ Consumer for each element in the array.
+      -> Consumer Value Doc (Vector a)
 array desc =
   wrap (\v d -> (Wrap doc (fst (d Aeson.Null)),v))
        (\v _ p ->
