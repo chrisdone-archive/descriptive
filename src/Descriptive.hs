@@ -95,9 +95,6 @@ data Result e a
   | Continued e -- ^ There were errors but we continued to collect all the errors.
   deriving (Show,Eq,Ord)
 
-(≡) :: a -> a -> a
-(≡) a b = a
-
 --
 -- first id ≡ \r -> case r of
 --               Succeeded a -> Succeeded a
