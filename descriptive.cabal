@@ -31,6 +31,7 @@ library
                    , scientific
                    , text
                    , transformers
+                   , vector
 
 test-suite test
     type: exitcode-stdio-1.0
