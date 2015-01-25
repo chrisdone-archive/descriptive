@@ -204,7 +204,10 @@ label :: Text             -- ^ Some label.
       -> Consumer s Doc a
 label desc =
   wrap (\s d -> (Wrap doc (fst (d s)),s))
-       (\s _ p -> p s)
+       (\s _ p ->
+          case p s of
+            (Failed e,s') -> (Failed (Wrap doc e),s')
+            k -> k)
   where doc = Label desc
 
 -- | Wrap a consumer with some handy information.
@@ -213,5 +216,8 @@ info :: Text             -- ^ Some information.
      -> Consumer s Doc a
 info desc =
   wrap (\s d -> (Wrap doc (fst (d s)),s))
-       (\s _ p -> p s)
+       (\s _ p ->
+          case p s of
+            (Failed e,s') -> (Failed (Wrap doc e),s')
+            k -> k)
   where doc = Info desc
