@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -9,7 +10,7 @@
 
 module Descriptive.JSON
   (-- * Combinators
-   obj
+   object
   ,key
   ,string
   ,integer
@@ -18,27 +19,28 @@ module Descriptive.JSON
   )
   where
 
-import Data.Bifunctor
-import Data.Monoid
 import Descriptive
 
-import Data.Aeson
-import Data.Aeson.Types
+import Data.Aeson hiding (Value(Object),object)
+import Data.Aeson.Types (Value,parseMaybe)
+import Data.Bifunctor
+import Data.Data
+import Data.Monoid
 import Data.Text (Text)
 
 -- | Description of parseable things.
 data Doc
   = Integer !Text
   | Text !Text
-  | Struct !Text
+  | Object !Text
   | Key !Text
-  deriving (Show,Eq)
+  deriving (Eq,Show,Typeable,Data)
 
 -- | Consume an object.
-obj :: Text -- ^ Description of what the object is.
-    -> Consumer Object Doc a -- ^ An object consumer.
-    -> Consumer Value Doc a
-obj desc =
+object :: Text -- ^ Description of what the object is.
+       -> Consumer Object Doc a -- ^ An object consumer.
+       -> Consumer Value Doc a
+object desc =
   wrap (\v d -> (Wrap doc (fst (d mempty)),v))
        (\v _ p ->
           case fromJSON v of
@@ -49,7 +51,7 @@ obj desc =
                  (Continued e,_) -> Failed (Wrap doc e)
                  (Succeeded a,_) -> Succeeded a
               ,toJSON o))
-  where doc = Struct desc
+  where doc = Object desc
 
 -- | Consume from object at the given key.
 key :: Text -- ^ The key to lookup.

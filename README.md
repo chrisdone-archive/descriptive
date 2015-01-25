@@ -191,12 +191,12 @@ data Submission =
 
 submission :: Consumer Value Doc Submission
 submission =
-  obj "Submission"
-      (Submission
-        <$> key "token" (integer "Submission token; see the API docs")
-        <*> key "title" (string "Submission title")
-        <*> key "comment" (string "Submission comment")
-        <*> key "subreddit" (integer "The ID of the subreddit"))
+  object "Submission"
+         (Submission
+           <$> key "token" (integer "Submission token; see the API docs")
+           <*> key "title" (string "Submission title")
+           <*> key "comment" (string "Submission comment")
+           <*> key "subreddit" (integer "The ID of the subreddit"))
 
 sample :: Value
 sample =

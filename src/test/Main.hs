@@ -167,12 +167,12 @@ data Submission =
 
 submission :: Consumer Value JSON.Doc Submission
 submission =
-  JSON.obj "Submission"
-           (Submission
-             <$> JSON.key "token" (JSON.integer "Submission token; see the API docs")
-             <*> JSON.key "title" (JSON.string "Submission title")
-             <*> JSON.key "comment" (JSON.string "Submission comment")
-             <*> JSON.key "subreddit" (JSON.integer "The ID of the subreddit"))
+  JSON.object "Submission"
+              (Submission
+                <$> JSON.key "token" (JSON.integer "Submission token; see the API docs")
+                <*> JSON.key "title" (JSON.string "Submission title")
+                <*> JSON.key "comment" (JSON.string "Submission comment")
+                <*> JSON.key "subreddit" (JSON.integer "The ID of the subreddit"))
 
 sample :: Value
 sample =
@@ -194,7 +194,7 @@ json :: Spec
 json =
   do it "describe JSON"
         (describe submission (toJSON ()) ==
-         Wrap (JSON.Struct "Submission")
+         Wrap (JSON.Object "Submission")
               (And (And (And (Wrap (JSON.Key "token")
                                    (Unit (JSON.Integer "Submission token; see the API docs")))
                              (Wrap (JSON.Key "title")
@@ -211,6 +211,6 @@ json =
                                ,submissionSubreddit = 234214}))
      it "failing json"
         (consume submission badsample ==
-         Failed (Wrap (JSON.Struct "Submission")
+         Failed (Wrap (JSON.Object "Submission")
                       (Wrap (JSON.Key "comment")
                             (Unit (JSON.Text "Submission comment")))))
