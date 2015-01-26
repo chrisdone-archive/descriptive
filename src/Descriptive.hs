@@ -21,11 +21,11 @@ module Descriptive
   ,Result(..)
   -- * Combinators
   ,consumer
-  ,wrap
-  ,sequencing)
+  ,wrap)
   where
 
 import Control.Applicative
+import Control.Monad.State.Strict
 import Data.Bifunctor
 import Data.Function
 import Data.Monoid
@@ -37,26 +37,25 @@ import Data.Monoid
 consume :: Consumer s d a -- ^ The consumer to run.
         -> s -- ^ Initial state.
         -> Result (Description d) a
-consume (Consumer _ m) = fst . m
+consume c s = evalState (runConsumer c) s
 
 -- | Describe a consumer.
 describe :: Consumer s d a -- ^ The consumer to run.
-         -> s -- ^ Initial state. Can be empty if you don't use it for
+         -> s -- ^ Initial state. Can be \"empty\" if you don't use it for
               -- generating descriptions.
          -> Description d -- ^ A description and resultant state.
-describe (Consumer desc _) = fst . desc
+describe c s = evalState (runDescription c) s
 
 -- | Run a consumer.
-runConsumer :: Consumer s d a -- ^ The consumer to run.
-            -> s -- ^ Initial state.
-            -> (Result (Description d) a,s)
+runConsumer :: Monad m
+            => Consumer s d a -- ^ The consumer to run.
+            -> StateT s m (Result (Description d) a)
 runConsumer (Consumer _ m) = m
 
 -- | Describe a consumer.
-runDescription :: Consumer s d a -- ^ The consumer to run.
-               -> s -- ^ Initial state. Can be empty if you don't use it for
-                    -- generating descriptions.
-               -> (Description d,s) -- ^ A description and resultant state.
+runDescription :: Monad m
+               => Consumer s d a -- ^ The consumer to run.
+               -> StateT s m (Description d) -- ^ A description and resultant state.
 runDescription (Consumer desc _) = desc
 
 --------------------------------------------------------------------------------
@@ -85,8 +84,8 @@ data Bound
 
 -- | A consumer.
 data Consumer s d a =
-  Consumer {consumerDesc :: s -> (Description d,s)
-           ,consumerParse :: s -> (Result (Description d) a,s)}
+  Consumer {consumerDesc :: forall m. Monad m => StateT s m (Description d)
+           ,consumerParse :: forall m. Monad m => StateT s m (Result (Description d) a)}
 
 -- | Some result.
 data Result e a
@@ -110,109 +109,114 @@ instance Bifunctor Result where
 instance Functor (Consumer s d) where
   fmap f (Consumer d p) =
     Consumer d
-             (\s ->
-                case p s of
-                  (Failed e,s') -> (Failed e,s')
-                  (Continued e,s') -> (Continued e,s')
-                  (Succeeded a,s') ->
-                    (Succeeded (f a),s'))
+             (do r <- p
+                 case undefined of
+                   (Failed e) ->
+                     return (Failed e)
+                   (Continued e) ->
+                     return (Continued e)
+                   (Succeeded a) ->
+                     return (Succeeded (f a)))
 
 instance Applicative (Consumer s d) where
   pure a =
-    consumer (\s -> (mempty,s))
-             (\s -> (Succeeded a,s))
+    consumer (return mempty)
+             (return (Succeeded a))
   Consumer d pf <*> Consumer d' p' =
-    consumer (\s ->
-                let !(e,s') = d s
-                    !(e',s'') = d' s'
-                in (e <> e',s''))
-             (\s ->
-                let !(mf,s') = pf s
-                    !(ma,s'') = p' s'
-                in case mf of
-                     Failed e -> (Failed e,s')
-                     Continued e ->
-                       case ma of
-                         Failed e' ->
-                           (Failed e',s'')
-                         Continued e' ->
-                           (Continued (e <> e'),s'')
-                         Succeeded _ ->
-                           (Continued e,s'')
-                     Succeeded f ->
-                       case ma of
-                         Continued e ->
-                           (Continued e,s'')
-                         Failed e ->
-                           (Failed e,s'')
-                         Succeeded a ->
-                           (Succeeded (f a),s''))
+    consumer (do e <- d
+                 e' <- d'
+                 return (e <> e'))
+             (do mf <- pf
+                 s <- get
+                 ma <- p'
+                 case mf of
+                   Failed e ->
+                     do put s
+                        return (Failed e)
+                   Continued e ->
+                     case ma of
+                       Failed e' ->
+                         return (Failed e')
+                       Continued e' ->
+                         return (Continued (e <> e'))
+                       Succeeded{} ->
+                         return (Continued e)
+                   Succeeded f ->
+                     case ma of
+                       Continued e ->
+                         return (Continued e)
+                       Failed e ->
+                         return (Failed e)
+                       Succeeded a ->
+                         return (Succeeded (f a)))
 
 instance Alternative (Consumer s d) where
   empty =
-    Consumer (\s -> (mempty,s))
-             (\s -> (Failed mempty,s))
-  a <|> b =
-    Consumer (\s ->
-                let !(d1,s') = consumerDesc a s
-                    !(d2,s'') = consumerDesc b s'
-                in (Or d1 d2,s''))
-             (\s ->
-                case consumerParse a s of
-                  (Continued e1,s') ->
-                    case consumerParse b s' of
-                      (Failed e2,s'') ->
-                        (Failed e2,s'')
-                      (Continued e2,s'') ->
-                        (Continued (e1 <> e2),s'')
-                      (Succeeded a',s'') ->
-                        (Succeeded a',s'')
-                  (Failed e1,_) ->
-                    case consumerParse b s of
-                      (Failed e2,s') ->
-                        (Failed (Or e1 e2),s')
-                      (Continued e2,s'') ->
-                        (Continued e2,s'')
-                      (Succeeded a2,s') ->
-                        (Succeeded a2,s')
-                  (Succeeded a1,s') ->
-                    (Succeeded a1,s'))
-  some = sequenceHelper 1
-  many = sequenceHelper 0
+    consumer (return mempty)
+             (return (Failed mempty))
+  Consumer d p <|> Consumer d' p' =
+    consumer (do d1 <- d
+                 d2 <- d'
+                 return (Or d1 d2))
+             (do s <- get
+                 r <- p
+                 case r of
+                   Continued e1 ->
+                     do r' <- p'
+                        case r' of
+                          Failed e2 ->
+                            return (Failed e2)
+                          Continued e2 ->
+                            return (Continued (e1 <> e2))
+                          Succeeded a' ->
+                            return (Succeeded a')
+                   Failed e1 ->
+                     do put s
+                        r' <- p'
+                        case r' of
+                          Failed e2 ->
+                            return (Failed (Or e1 e2))
+                          Continued e2 ->
+                            return (Continued e2)
+                          Succeeded a2 ->
+                            return (Succeeded a2)
+                   Succeeded a1 -> return (Succeeded a1))
 
 -- | An internal sequence maker which describes itself better than
 -- regular Alternative, and is strict, not lazy.
 sequenceHelper :: Integer -> Consumer t d a -> Consumer t d [a]
 sequenceHelper minb =
-  wrap (\s d -> first redescribe (d s))
-       (\s _ r ->
-          fix (\go !i s' as ->
-                 case r s' of
-                   (Succeeded a,s'') ->
-                     go (i + 1)
-                        s''
-                        (a : as)
-                   (Continued e,s'') ->
-                     fix (\continue e' s''' ->
-                            case r s''' of
-                              (Continued e'',s'''') ->
-                                continue (e' <> e'') s''''
-                              (Succeeded{},s'''') ->
-                                continue e' s''''
-                              (Failed e'',s'''')
-                                | i >= minb ->
-                                  (Continued e',s''')
-                                | otherwise ->
-                                  (Failed (redescribe e''),s''''))
-                         e
-                         s''
-                   (Failed e,s'')
-                     | i >= minb ->
-                       (Succeeded (reverse as),s')
-                     | otherwise ->
-                       (Failed (redescribe e),s''))
+  wrap (liftM redescribe)
+       (\_ p ->
+          fix (\go !i as ->
+                 do s <- get
+                    r <- p
+                    case r of
+                      Succeeded a ->
+                        go (i + 1)
+                           (a : as)
+                      Continued e ->
+                        fix (\continue e' ->
+                               do s' <- get
+                                  r' <- p
+                                  case r' of
+                                    Continued e'' ->
+                                      continue (e' <> e'')
+                                    Succeeded{} -> continue e'
+                                    Failed e''
+                                      | i >= minb ->
+                                        do put s'
+                                           return (Continued e')
+                                      | otherwise ->
+                                        return (Failed (redescribe e'')))
+                            e
+                      Failed e
+                        | i >= minb ->
+                          do put s
+                             return (Succeeded (reverse as))
+                        | otherwise ->
+                          return (Failed (redescribe e)))
               0
-              s
               [])
   where redescribe = Bounded minb UnlimitedBound
 
@@ -233,38 +237,32 @@ instance (Monoid a) => Monoid (Result (Description d) a) where
           Succeeded b -> Succeeded (a <> b)
 
 instance (Monoid a) => Monoid (Consumer s d a) where
-  mempty = Consumer (\s -> (mempty,s)) (\s -> (mempty,s))
+  mempty =
+    consumer (return mempty)
+             (return mempty)
   mappend x y = (<>) <$> x <*> y
 
 --------------------------------------------------------------------------------
 -- Combinators
 
--- | Make a consumer.
-consumer :: (s -> (Description d,s)) -- ^ Produce description based on the state.
-         -> (s -> (Result (Description d) a,s)) -- ^ Parse the state and maybe transform it if desired.
+-- | Make a self-describing consumer.
+consumer :: (forall m. Monad m => StateT s m (Description d))
+         -- ^ Produce description based on the state.
+         -> (forall m. Monad m => StateT s m (Result (Description d) a))
+         -- ^ Parse the state and maybe transform it if desired.
          -> Consumer s d a
 consumer d p =
   Consumer d p
 
--- | Wrap a consumer with another consumer.
-wrap :: (s -> (t -> (Description d,t)) -> (Description d,s)) -- ^ Transformer the description.
-     -> (s -> (t -> (Description d,t)) -> (t -> (Result (Description d) a,t)) -> (Result (Description d) b,s)) -- ^ Transform the parser. Can re-run the parser if desired.
-     -> Consumer t d a -- ^ The consumer to transform.
-     -> Consumer s d b -- ^ A new consumer with a potentially new state type.
+-- | Wrap a consumer with another consumer. The type looks more
+-- intimidating than it actually is. The source code is trivial. It
+-- simply allows for a way to transform the type of the state.
+wrap :: (forall m. Monad m => StateT t m (Description d) -> StateT s m (Description d))
+     -- ^ Transform the description.
+     -> (forall m. Monad m => StateT t m (Description d) -> StateT t m (Result (Description d) a) -> StateT s m (Result (Description d) b))
+     -- ^ Transform the parser. Can re-run the parser as many times as desired.
+     -> Consumer t d a
+     -> Consumer s d b
 wrap redescribe reparse (Consumer d p) =
-  Consumer (\s -> redescribe s d)
-           (\s -> reparse s d p)
-
--- | Compose contiguous items into one sequence. Similar to 'sequenceA'.
-sequencing :: [Consumer d s a] -> Consumer d s [a]
-sequencing =
-  wrap (\s d ->
-          first (Sequence . se)
-                (d s))
-       (\s _ p -> p s) .
-  go
-  where se (And x y) = x : se y
-        se None = []
-        se x = [x]
-        go (x:xs) = (:) <$> x <*> sequencing xs
-        go [] = mempty
+  Consumer (redescribe d)
+           (reparse d p)
