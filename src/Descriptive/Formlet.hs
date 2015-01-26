@@ -13,6 +13,7 @@ module Descriptive.Formlet
 
 import           Descriptive
 
+import           Control.Monad.State.Strict
 import           Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M
 import           Data.Text (Text)
@@ -32,11 +33,17 @@ data FormletState =
 -- | Consume any character.
 indexed :: Consumer FormletState Formlet Text
 indexed =
-  consumer (\(nextIndex -> (i,s)) -> (d i,s))
-           (\(nextIndex -> (i,s)) ->
-              case M.lookup i (formletMap s) of
-                Nothing -> (Failed (d i),s)
-                Just a -> (Succeeded a,s))
+  consumer (do i <- nextIndex
+               return (d i))
+           (do i <- nextIndex
+               s <- get
+               return (case M.lookup i (formletMap s) of
+                         Nothing -> Failed (d i)
+                         Just a -> Succeeded a))
   where d = Unit . Index
-        nextIndex s =
-          (formletIndex s,s {formletIndex = formletIndex s + 1})
+        nextIndex :: MonadState FormletState m => m Integer
+        nextIndex =
+          do i <- gets formletIndex
+             modify (\s ->
+                       s {formletIndex = formletIndex s + 1})
+             return i

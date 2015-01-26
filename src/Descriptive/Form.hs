@@ -14,7 +14,7 @@ module Descriptive.Form
 
 import           Descriptive
 
-import           Control.Arrow
+import           Control.Monad.State.Strict
 import           Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M
 import           Data.Text (Text)
@@ -28,12 +28,11 @@ data Form
 -- | Consume any input value.
 input :: Text -> Consumer (Map Text Text) Form Text
 input name =
-  consumer (d,)
-           (\s ->
-              (case M.lookup name s of
-                 Nothing -> Continued d
-                 Just a -> Succeeded a
-              ,s))
+  consumer (return d)
+           (do s <- get
+               return (case M.lookup name s of
+                         Nothing -> Continued d
+                         Just a -> Succeeded a))
   where d = Unit (Input name)
 
 -- | Validate a form input with a description of what's required.
@@ -42,15 +41,18 @@ validate :: Text -- ^ Description of what it expects.
          -> Consumer (Map Text Text) Form a -- ^ Consumer to add validation to.
          -> Consumer (Map Text Text) Form b
 validate d' check =
-  wrap (\s d -> redescribe (d s))
-       (\s d p ->
-          case p s of
-            (Failed e,s') -> (Failed e,s')
-            (Continued e,s') -> (Continued (wrapper e),s')
-            (Succeeded a,s') ->
-              case check a of
-                Nothing ->
-                  (Continued (fst (redescribe (d s))),s')
-                Just a' -> (Succeeded a',s'))
-  where redescribe = first wrapper
-        wrapper = Wrap (Constraint d')
+  wrap (liftM wrapper)
+       (\d p ->
+          do s <- get
+             r <- p
+             case r of
+               (Failed e) -> return (Failed e)
+               (Continued e) ->
+                 return (Continued (wrapper e))
+               (Succeeded a) ->
+                 case check a of
+                   Nothing ->
+                     do doc <- withStateT (const s) d
+                        return (Continued (wrapper doc))
+                   Just a' -> return (Succeeded a'))
+  where wrapper = Wrap (Constraint d')

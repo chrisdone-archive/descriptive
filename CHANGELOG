@@ -1,3 +1,7 @@
+0.5.0:
+	* Changed the parser/doc type to use StateT m. So now you can use
+	monads as part of your consumers.
+
 0.2.0:
 	* Change the type of flag.
 	* Add the switch combinator (used to be “flag”).

@@ -1,5 +1,4 @@
 {-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE FlexibleContexts #-}
 
@@ -24,10 +23,10 @@ module Descriptive.Options
   ,textOpt)
   where
 
-import           Control.Applicative
-import           Data.Bifunctor
 import           Descriptive
 
+import           Control.Applicative
+import           Control.Monad.State.Strict
 import           Data.Char
 import           Data.List
 import           Data.Monoid
@@ -51,28 +50,31 @@ stop :: Consumer [Text] (Option a) a
      -- ^ A parser which, when it succeeds, causes the whole parser to stop.
      -> Consumer [Text] (Option a) ()
 stop =
-  wrap (\s d ->
-          first (Wrap Stops)
-                (d s))
-       (\s d p ->
-          case p s of
-            (Failed _,s') -> (Succeeded (),s')
-            (Continued e,s') -> (Continued e,s')
-            (Succeeded a,s') ->
-              (Failed (Wrap (Stopped a)
-                            (fst (d s)))
-              ,s'))
+  wrap (liftM (Wrap Stops))
+       (\d p ->
+          do r <- p
+             s <- get
+             case r of
+               (Failed _) ->
+                 return (Succeeded ())
+               (Continued e) ->
+                 return (Continued e)
+               (Succeeded a) ->
+                 do doc <- withStateT (const s) d
+                    return (Failed (Wrap (Stopped a)
+                                         doc)))
 
 -- | Consume one argument from the argument list and pops it from the
 -- start of the list.
 anyString :: Text -- Help for the string.
           -> Consumer [Text] (Option a) Text
 anyString help =
-  consumer (d,)
-           (\s ->
-              case s of
-                [] -> (Failed d,s)
-                (x:s') -> (Succeeded x,s'))
+  consumer (return d)
+           (do s <- get
+               case s of
+                 [] -> return (Failed d)
+                 (x:s') -> do put s'
+                              return (Succeeded x))
   where d = Unit (AnyString help)
 
 -- | Consume one argument from the argument list which must match the
@@ -82,12 +84,13 @@ constant :: Text -- ^ String.
          -> v
          -> Consumer [Text] (Option a) v
 constant x' desc v =
-  consumer (d,)
-           (\s ->
-              case s of
-                (x:s') | x == x' ->
-                  (Succeeded v,s')
-                _ -> (Failed d,s))
+  consumer (return d)
+           (do s <- get
+               case s of
+                 (x:s') | x == x' ->
+                   do put s'
+                      return (Succeeded v)
+                 _ -> return (Failed d))
   where d = Unit (Constant x' desc)
 
 -- | Find a value flag which must succeed. Removes it from the
@@ -97,12 +100,12 @@ flag :: Text -- ^ Name.
      -> v    -- ^ Value returned when present.
      -> Consumer [Text] (Option a) v
 flag name help v =
-  consumer (d,)
-           (\s ->
-              if elem ("--" <> name) s
-                 then (Succeeded v,filter (/= "--" <> name) s)
-                 else (Failed d,s)
-              )
+  consumer (return d)
+           (do s <- get
+               if elem ("--" <> name) s
+                  then do put (filter (/= "--" <> name) s)
+                          return (Succeeded v)
+                  else return (Failed d))
   where d = Unit (Flag name help)
 
 -- | Find a boolean flag. Always succeeds. Omission counts as
@@ -120,11 +123,12 @@ prefix :: Text -- ^ Prefix string.
        -> Text -- ^ Description.
        -> Consumer [Text] (Option a) Text
 prefix pref help =
-  consumer (d,)
-           (\s ->
-              case find (T.isPrefixOf ("-" <> pref)) s of
-                Nothing -> (Failed d,s)
-                Just a -> (Succeeded (T.drop (T.length pref + 1) a), delete a s))
+  consumer (return d)
+           (do s <- get
+               case find (T.isPrefixOf ("-" <> pref)) s of
+                 Nothing -> return (Failed d)
+                 Just a -> do put (delete a s)
+                              return (Succeeded (T.drop (T.length pref + 1) a)))
   where d = Unit (Prefix pref help)
 
 -- | Find a named argument e.g. @--name value@. Removes it from the
@@ -133,18 +137,18 @@ arg :: Text -- ^ Name.
     -> Text -- ^ Description.
     -> Consumer [Text] (Option a) Text
 arg name help =
-  consumer (d,)
-           (\s ->
-              let indexedArgs =
-                    zip [0 :: Integer ..] s
-              in case find ((== "--" <> name) . snd) indexedArgs of
-                   Nothing -> (Failed d,s)
-                   Just (i,_) ->
-                     case lookup (i + 1) indexedArgs of
-                       Nothing -> (Failed d,s)
-                       Just text ->
-                         (Succeeded text
-                         ,map snd (filter (\(j,_) -> j /= i && j /= i + 1) indexedArgs)))
+  consumer (return d)
+           (do s <- get
+               let indexedArgs =
+                     zip [0 :: Integer ..] s
+               case find ((== "--" <> name) . snd) indexedArgs of
+                 Nothing -> return (Failed d)
+                 Just (i,_) ->
+                   case lookup (i + 1) indexedArgs of
+                     Nothing -> return (Failed d)
+                     Just text ->
+                       do put (map snd (filter (\(j,_) -> j /= i && j /= i + 1) indexedArgs))
+                          return (Succeeded text))
   where d = Unit (Arg name help)
 
 -- | Make a text description of the command line options.

@@ -1,5 +1,5 @@
 name:                descriptive
-version:             0.4.3
+version:             0.5.0
 synopsis:            Self-describing consumers/parsers; forms, cmd-line args, JSON, etc.
 description:         Self-describing consumers/parsers. See the README.md for more information. It is currently EXPERIMENTAL.
 stability:           Experimental
@@ -23,6 +23,7 @@ library
                      Descriptive.Formlet
                      Descriptive.Options
                      Descriptive.JSON
+  other-modules:     Descriptive.Internal
   build-depends:     aeson
                    , base >= 4 && <5
                    , bifunctors

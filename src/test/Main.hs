@@ -44,8 +44,7 @@ characters =
                    Char.string "abc")
                   mempty ==
          And (Bounded 0 UnlimitedBound (Unit "k"))
-             (Sequence [Unit "a"
-                       ,Sequence [Unit "b",Sequence [Unit "c",Sequence []]]]))
+             (Sequence [Unit "a",Unit "b",Unit "c",None]))
      it "consume"
         (consume (many (Char.char 'k') <>
                   Char.string "abc")

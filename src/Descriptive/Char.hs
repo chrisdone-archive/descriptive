@@ -6,36 +6,45 @@
 
 module Descriptive.Char where
 
+import           Data.Traversable
 import           Descriptive
 
+import           Control.Monad.State.Strict
 import           Data.Text (Text)
 import qualified Data.Text as T
 
 -- | Consume any character.
 anyChar :: Consumer [Char] Text Char
 anyChar =
-  consumer (d,)
-           (\s ->
-              case s of
-                (c':cs') -> (Succeeded c',cs')
-                [] -> (Failed d,s))
+  consumer (return d)
+           (do s <- get
+               case s of
+                 (c':cs') -> do put cs'
+                                return (Succeeded c')
+                 [] -> return (Failed d))
   where d = Unit "a character"
 
 -- | A character consumer.
 char :: Char -> Consumer [Char] Text Char
 char c =
-  wrap (const .
-        (d,))
-       (\s _ p ->
-          case p s of
-            (Failed e,s') -> (Failed e,s')
-            (Continued e,s') -> (Continued e,s')
-            (Succeeded c',s')
-              | c' == c -> (Succeeded c,s')
-              | otherwise -> (Failed d,s'))
+  wrap (liftM (const d))
+       (\_ p ->
+          do r <- p
+             return (case r of
+                       (Failed e) -> Failed e
+                       (Continued e) ->
+                         Continued e
+                       (Succeeded c')
+                         | c' == c -> Succeeded c
+                         | otherwise -> Failed d))
        anyChar
   where d = Unit (T.singleton c)
 
 -- | A string consumer.
 string :: [Char] -> Consumer [Char] Text [Char]
-string = sequencing . map char
+string =
+  wrap (liftM (Sequence . flattenAnds))
+       (\_ p -> p) .
+  sequenceA . map char
+  where flattenAnds (And x y) = flattenAnds x ++ flattenAnds y
+        flattenAnds x = [x]

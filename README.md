@@ -23,8 +23,11 @@ data Consumer s d a
 To make a consumer, this combinator is used:
 
 ``` haskell
-consumer :: (s -> (Description d,s))
-         -> (s -> (Result (Description d) a,s))
+-- | Make a self-describing consumer.
+consumer :: (forall m. Monad m => StateT s m (Description d))
+         -- ^ Produce description based on the state.
+         -> (forall m. Monad m => StateT s m (Result (Description d) a))
+         -- ^ Parse the state and maybe transform it if desired.
          -> Consumer s d a
 ```
 
@@ -37,8 +40,26 @@ state during generation of the description and during parsing.
 To use a consumer or describe what it does, these are used:
 
 ``` haskell
-consume :: Consumer s d a -> s -> Result (Description d) a
-describe :: Consumer s d a -> s -> Description d
+consume :: Consumer s d a -- ^ The consumer to run.
+        -> s -- ^ Initial state.
+        -> Result (Description d) a
+describe :: Consumer s d a -- ^ The consumer to run.
+         -> s -- ^ Initial state. Can be \"empty\" if you don't use it for
+              -- generating descriptions.
+         -> Description d -- ^ A description and resultant state.
+```
+
+Alternatively the parser/printer can be run in a monad of your choice:
+
+``` haskell
+runConsumer :: Monad m
+            => Consumer s d a -- ^ The consumer to run.
+            -> StateT s m (Result (Description d) a)
+runConsumer (Consumer _ m) = m
+runDescription :: Monad m
+               => Consumer s d a -- ^ The consumer to run.
+               -> StateT s m (Description d)
+runDescription (Consumer desc _) = desc
 ```
 
 A description is like this:
@@ -48,10 +69,10 @@ data Description a
   = Unit !a
   | Bounded !Integer !Bound !(Description a)
   | And !(Description a) !(Description a)
-  | Sequence [Description a]
-  | Wrap a (Description a)
+  | Or !(Description a) !(Description a)
+  | Sequence ![Description a]
+  | Wrap a !(Description a)
   | None
-  deriving (Show)
 ```
 
 You configure the `a` for your use-case, but the rest is generatable
@@ -75,7 +96,7 @@ See `Descriptive.Char`.
 ``` haskell
 λ> describe (many (char 'k') <> string "abc") mempty
 And (Bounded 0 UnlimitedBound (Unit "k"))
-    (Sequence [Unit "a",Sequence [Unit "b",Sequence [Unit "c",Sequence []]]])
+    (Sequence [Unit "a",Unit "b",Unit "c",None])
 λ> consume (many (char 'k') <> string "abc") "kkkabc"
 (Succeeded "kkkabc")
 λ> consume (many (char 'k') <> string "abc") "kkkab"
@@ -90,14 +111,13 @@ See `Descriptive.Form`.
 
 ``` haskell
 λ> describe ((,) <$> input "username" <*> input "password") mempty
-(And (Unit (Input "username")) (Unit (Input "password")),fromList [])
+And (Unit (Input "username")) (Unit (Input "password"))
 
 λ> consume ((,) <$>
             input "username" <*>
             input "password")
            (M.fromList [("username","chrisdone"),("password","god")])
-(Succeeded ("chrisdone","god")
-,fromList [("password","god"),("username","chrisdone")])
+Succeeded ("chrisdone","god")
 ```
 
 Conditions on two inputs:
@@ -134,9 +154,7 @@ See `Descriptive.Formlet`.
 ``` haskell
 λ> describe ((,) <$> indexed <*> indexed)
             (FormletState mempty 0)
-And (Unit (Index 0))
-    (Unit (Index 1))
-              ,formletIndex = 2})
+And (Unit (Index 0)) (Unit (Index 1))
 λ> consume ((,) <$> indexed <*> indexed)
            (FormletState (M.fromList [(0,"chrisdone"),(1,"god")]) 0)
 Succeeded ("chrisdone","god")
@@ -152,10 +170,11 @@ See `Descriptive.Options`.
 ``` haskell
 server =
   ((,,,) <$>
-   constant "start" <*>
+   constant "start" "cmd" () <*>
    anyString "SERVER_NAME" <*>
-   flag "dev" "Enable dev mode?" <*>
+   switch "dev" "Enable dev mode?" <*>
    arg "port" "Port to listen on")
+   ((,,,) <$>
 ```
 
 ``` haskell

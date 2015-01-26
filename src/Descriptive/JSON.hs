@@ -29,9 +29,11 @@ module Descriptive.JSON
   )
   where
 
-import           Data.Scientific
 import           Descriptive
+import           Descriptive.Internal
 
+import           Control.Monad.State.Strict
+import           Data.Scientific
 import           Data.Function
 import           Data.Aeson hiding (Value(Object,Null,Array),object)
 import           Data.Aeson.Types (Value,parseMaybe)
@@ -64,16 +66,29 @@ object :: Text -- ^ Description of what the object is.
        -> Consumer Object Doc a -- ^ An object consumer.
        -> Consumer Value Doc a
 object desc =
-  wrap (\v d -> (Wrap doc (fst (d mempty)),v))
-       (\v _ p ->
-          case fromJSON v of
-            Error{} -> (Failed (Unit doc),v)
-            Success o ->
-              (case p o of
-                 (Failed e,_) -> Failed (Wrap doc e)
-                 (Continued e,_) -> Failed (Wrap doc e)
-                 (Succeeded a,_) -> Succeeded a
-              ,toJSON o))
+  wrap (\d ->
+          do s <- get
+             runSubStateT (const mempty)
+                          (const s)
+                          (liftM (Wrap doc) d))
+       (\_ p ->
+          do v <- get
+             case fromJSON v of
+               Error{} ->
+                 return (Failed (Unit doc))
+               Success (o :: Object) ->
+                 do s <- get
+                    runSubStateT
+                      (const o)
+                      (const s)
+                      (do r <- p
+                          case r of
+                            Failed e ->
+                              return (Failed (Wrap doc e))
+                            Continued e ->
+                              return (Continued (Wrap doc e))
+                            Succeeded a ->
+                              return (Succeeded a)))
   where doc = Object desc
 
 -- | Consume from object at the given key.
@@ -81,18 +96,23 @@ key :: Text -- ^ The key to lookup.
     -> Consumer Value Doc a -- ^ A value consumer of the object at the key.
     -> Consumer Object Doc a
 key k =
-  wrap (\o d ->
-          first (Wrap doc)
-                (second (const o)
-                        (d (toJSON o))))
-       (\o _ p ->
-          case parseMaybe (const (o .: k))
-                          () of
-            Nothing -> (Failed (Unit doc),o)
-            Just (v :: Value) ->
-              first (bimap (Wrap doc) id)
-                    (second (const o)
-                            (p v)))
+  wrap (\d ->
+          do s <- get
+             runSubStateT toJSON
+                          (const s)
+                          (liftM (Wrap doc) d))
+       (\_ p ->
+          do s <- get
+             case parseMaybe (const (s .: k))
+                             () of
+               Nothing ->
+                 return (Failed (Unit doc))
+               Just (v :: Value) ->
+                 do r <-
+                      runSubStateT (const v)
+                                   (const s)
+                                   p
+                    return (bimap (Wrap doc) id r))
   where doc = Key k
 
 -- | Optionally consume from object at the given key, only if it
@@ -101,18 +121,23 @@ keyMaybe :: Text -- ^ The key to lookup.
          -> Consumer Value Doc a -- ^ A value consumer of the object at the key.
          -> Consumer Object Doc (Maybe a)
 keyMaybe k =
-  wrap (\o d ->
-          first (Wrap doc)
-                (second (const o)
-                        (d (toJSON o))))
-       (\o _ p ->
-          case parseMaybe (const (o .: k))
-                          () of
-            Nothing -> (Succeeded Nothing,o)
-            Just (v :: Value) ->
-              first (bimap (Wrap doc) Just)
-                    (second (const o)
-                            (p v)))
+  wrap (\d ->
+          do s <- get
+             runSubStateT toJSON
+                          (const s)
+                          (liftM (Wrap doc) d))
+       (\_ p ->
+          do s <- get
+             case parseMaybe (const (s .: k))
+                             () of
+               Nothing ->
+                 return (Succeeded Nothing)
+               Just (v :: Value) ->
+                 do r <-
+                      runSubStateT (const v)
+                                   (const s)
+                                   p
+                    return (bimap (Wrap doc) Just r))
   where doc = Key k
 
 -- | Consume an array.
@@ -120,82 +145,91 @@ array :: Text -- ^ Description of this array.
       -> Consumer Value Doc a -- ^ Consumer for each element in the array.
       -> Consumer Value Doc (Vector a)
 array desc =
-  wrap (\v d -> (Wrap doc (fst (d Aeson.Null)),v))
-       (\v _ p ->
-          case fromJSON v of
-            Error{} -> (Failed (Unit doc),v)
-            Success (o :: Vector Value) ->
-              (fix (\loop i acc ->
-                      if i < V.length o - 1
-                         then case p (o ! i) of
-                                (Failed e,_) ->
-                                  Failed (Wrap doc e)
-                                (Continued e,_) ->
-                                  Failed (Wrap doc e)
-                                (Succeeded a,_) ->
-                                  loop (i + 1) (a : acc)
-                         else Succeeded (V.fromList (reverse acc)))
-                   0
-                   []
-              ,v))
+  wrap (\d -> liftM (Wrap doc) d)
+       (\_ p ->
+          do s <- get
+             case fromJSON s of
+               Error{} ->
+                 return (Failed (Unit doc))
+               Success (o :: Vector Value) ->
+                 fix (\loop i acc ->
+                        if i < V.length o - 1
+                           then do r <-
+                                     runSubStateT (const (o ! i))
+                                                  (const s)
+                                                  p
+                                   case r of
+                                     Failed e ->
+                                       return (Failed (Wrap doc e))
+                                     Continued e ->
+                                       return (Failed (Wrap doc e))
+                                     Succeeded a ->
+                                       loop (i + 1)
+                                            (a : acc)
+                           else return (Succeeded (V.fromList (reverse acc))))
+                     0
+                     [])
   where doc = Array desc
 
 -- | Consume a string.
 string :: Text -- ^ Description of what the string is for.
        -> Consumer Value Doc Text
 string doc =
-  consumer (d,)
-           (\s ->
-              case fromJSON s of
-                Error{} -> (Failed d,s)
-                Success a -> (Succeeded a,s))
+  consumer (return d)
+           (do s <- get
+               case fromJSON s of
+                 Error{} -> return (Failed d)
+                 Success a ->
+                   return (Succeeded a))
   where d = Unit (Text doc)
 
 -- | Consume an integer.
 integer :: Text -- ^ Description of what the integer is for.
         -> Consumer Value Doc Integer
 integer doc =
-  consumer (d,)
-           (\s ->
-              case s of
-                Number a
-                  | Right i <- floatingOrInteger a ->
-                    (Succeeded i,s)
-                _ -> (Failed d,s))
+  consumer (return d)
+           (do s <- get
+               case s of
+                 Number a
+                   | Right i <- floatingOrInteger a ->
+                     return (Succeeded i)
+                 _ -> return (Failed d))
   where d = Unit (Integer doc)
 
 -- | Consume an double.
 double :: Text -- ^ Description of what the double is for.
-        -> Consumer Value Doc Double
+       -> Consumer Value Doc Double
 double doc =
-  consumer (d,)
-           (\s ->
-              case s of
-                Number a ->
-                  (Succeeded (toRealFloat a),s)
-                _ -> (Failed d,s))
+  consumer (return d)
+           (do s <- get
+               case s of
+                 Number a ->
+                   return (Succeeded (toRealFloat a))
+                 _ -> return (Failed d))
   where d = Unit (Double doc)
 
 -- | Parse a boolean.
 bool :: Text -- ^ Description of what the bool is for.
      -> Consumer Value Doc Bool
 bool doc =
-  consumer (d,)
-           (\s ->
-              case fromJSON s of
-                Error{} -> (Failed d,s)
-                Success a -> (Succeeded a,s))
+  consumer (return d)
+           (do s <- get
+               case fromJSON s of
+                 Error{} -> return (Failed d)
+                 Success a ->
+                   return (Succeeded a))
   where d = Unit (Boolean doc)
 
 -- | Expect null.
 null :: Text -- ^ What the null is for.
        -> Consumer Value Doc ()
 null doc =
-  consumer (d,)
-           (\s ->
-              case fromJSON s of
-                Success Aeson.Null -> (Succeeded (),s)
-                _ -> (Failed d,s))
+  consumer (return d)
+           (do s <- get
+               case fromJSON s of
+                 Success Aeson.Null ->
+                   return (Succeeded ())
+                 _ -> return (Failed d))
   where d = Unit (Null doc)
 
 -- | Wrap a consumer with a label e.g. a type tag.
@@ -203,11 +237,13 @@ label :: Text             -- ^ Some label.
       -> Consumer s Doc a -- ^ A value consumer.
       -> Consumer s Doc a
 label desc =
-  wrap (\s d -> (Wrap doc (fst (d s)),s))
-       (\s _ p ->
-          case p s of
-            (Failed e,s') -> (Failed (Wrap doc e),s')
-            k -> k)
+  wrap (liftM (Wrap doc))
+       (\_ p ->
+          do r <- p
+             case r of
+               Failed e ->
+                 return (Failed (Wrap doc e))
+               k -> return k)
   where doc = Label desc
 
 -- | Wrap a consumer with some handy information.
@@ -215,9 +251,11 @@ info :: Text             -- ^ Some information.
      -> Consumer s Doc a -- ^ A value consumer.
      -> Consumer s Doc a
 info desc =
-  wrap (\s d -> (Wrap doc (fst (d s)),s))
-       (\s _ p ->
-          case p s of
-            (Failed e,s') -> (Failed (Wrap doc e),s')
-            k -> k)
+  wrap (liftM (Wrap doc))
+       (\_ p ->
+          do r <- p
+             case r of
+               Failed e ->
+                 return (Failed (Wrap doc e))
+               k -> return k)
   where doc = Info desc
