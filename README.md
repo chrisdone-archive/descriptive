@@ -87,6 +87,22 @@ describeForm :: Description (Html ()) -> Html ()
 describeArgs :: Description CmdArgs -> Text
 ```
 
+One can wrap up a consumer to alter either the description or the
+parser or both, this can be used for wrapping labels, or adding
+validation, things of that nature:
+
+``` haskell
+wrap :: (forall m. Monad m => StateT t m (Description d)
+                           -> StateT s m (Description d))
+     -- ^ Transform the description.
+     -> (forall m. Monad m => StateT t m (Description d)
+                           -> StateT t m (Result (Description d) a)
+                           -> StateT s m (Result (Description d) b))
+     -- ^ Transform the parser. Can re-run the parser as many times as desired.
+     -> Consumer t d a
+     -> Consumer s d b
+```
+
 See below for some examples of this library.
 
 ## Parsing characters
