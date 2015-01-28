@@ -25,12 +25,11 @@ data Consumer s d a
 To make a consumer, this combinator is used:
 
 ``` haskell
--- | Make a self-describing consumer.
-consumer :: (forall m. Monad m => StateT s m (Description d))
+consumer :: (StateT s m (Description d))
          -- ^ Produce description based on the state.
-         -> (forall m. Monad m => StateT s m (Result (Description d) a))
+         -> (StateT s m (Result (Description d) a))
          -- ^ Parse the state and maybe transform it if desired.
-         -> Consumer s d a
+         -> Consumer s d m a
 ```
 
 The first argument generates a description based on some state. The
@@ -44,11 +43,11 @@ state during generation of the description and during parsing.
 To use a consumer or describe what it does, these are used:
 
 ``` haskell
-consume :: Consumer s d a -- ^ The consumer to run.
+consume :: Consumer s d Identity a -- ^ The consumer to run.
         -> s -- ^ Initial state.
         -> Result (Description d) a
 
-describe :: Consumer s d a -- ^ The consumer to run.
+describe :: Consumer s d Identity a -- ^ The consumer to run.
          -> s -- ^ Initial state. Can be \"empty\" if you don't use it for
               -- generating descriptions.
          -> Description d -- ^ A description and resultant state.
@@ -58,14 +57,12 @@ Alternatively the parser/printer can be run in a monad of your choice:
 
 ``` haskell
 runConsumer :: Monad m
-            => Consumer s d a -- ^ The consumer to run.
+            => Consumer s d m a -- ^ The consumer to run.
             -> StateT s m (Result (Description d) a)
-runConsumer (Consumer _ m) = m
 
 runDescription :: Monad m
-               => Consumer s d a -- ^ The consumer to run.
-               -> StateT s m (Description d)
-runDescription (Consumer desc _) = desc
+               => Consumer s d m a -- ^ The consumer to run.
+               -> StateT s m (Description d) -- ^ A description and resultant state.
 ```
 
 ### Descriptions
@@ -102,25 +99,23 @@ parser or both, this can be used for wrapping labels, or adding
 validation, things of that nature:
 
 ``` haskell
-wrap :: (forall m. Monad m => StateT t m (Description d)
-                           -> StateT s m (Description d))
+wrap :: (StateT t m (Description d) -> StateT s m (Description d))
      -- ^ Transform the description.
-     -> (forall m. Monad m => StateT t m (Description d)
-                           -> StateT t m (Result (Description d) a)
-                           -> StateT s m (Result (Description d) b))
+     -> (StateT t m (Description d) -> StateT t m (Result (Description d) a) -> StateT s m (Result (Description d) b))
      -- ^ Transform the parser. Can re-run the parser as many times as desired.
-     -> Consumer t d a
-     -> Consumer s d b
+     -> Consumer t d m a
+     -> Consumer s d m b
 ```
 
 There is also a handy function written in terms of `wrap` which will
 validate a consumer.
 
 ``` haskell
-validate :: d                                              -- ^ Description of what it expects.
-         -> (forall m. MonadState s m => a -> m (Maybe b)) -- ^ Attempt to parse the value.
-         -> Consumer s d a                                 -- ^ Consumer to add validation to.
-         -> Consumer s d b                                 -- ^ A new validating consumer.
+validate :: Monad m
+         => d                           -- ^ Description of what it expects.
+         -> (a -> StateT s m (Maybe b)) -- ^ Attempt to parse the value.
+         -> Consumer s d m a            -- ^ Consumer to add validation to.
+         -> Consumer s d m b            -- ^ A new validating consumer.
 ```
 
 See below for some examples of this library.
@@ -244,7 +239,7 @@ data Submission =
              ,submissionSubreddit :: !Integer}
   deriving (Show)
 
-submission :: Consumer Value Doc Submission
+submission :: Monad m => Consumer Value Doc m Submission
 submission =
   object "Submission"
          (Submission
