@@ -1,3 +1,4 @@
+{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE FlexibleContexts #-}
 
@@ -6,7 +7,6 @@
 module Descriptive.Form
   (-- * Combinators
    input
-  ,validate
   -- * Description
   ,Form (..)
   )
@@ -34,25 +34,3 @@ input name =
                          Nothing -> Continued d
                          Just a -> Succeeded a))
   where d = Unit (Input name)
-
--- | Validate a form input with a description of what's required.
-validate :: Text -- ^ Description of what it expects.
-         -> (a -> Maybe b) -- ^ Attempt to parse the value.
-         -> Consumer (Map Text Text) Form a -- ^ Consumer to add validation to.
-         -> Consumer (Map Text Text) Form b
-validate d' check =
-  wrap (liftM wrapper)
-       (\d p ->
-          do s <- get
-             r <- p
-             case r of
-               (Failed e) -> return (Failed e)
-               (Continued e) ->
-                 return (Continued (wrapper e))
-               (Succeeded a) ->
-                 case check a of
-                   Nothing ->
-                     do doc <- withStateT (const s) d
-                        return (Continued (wrapper doc))
-                   Just a' -> return (Succeeded a'))
-  where wrapper = Wrap (Constraint d')

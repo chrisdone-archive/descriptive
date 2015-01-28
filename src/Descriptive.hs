@@ -21,7 +21,8 @@ module Descriptive
   ,Result(..)
   -- * Combinators
   ,consumer
-  ,wrap)
+  ,wrap
+  ,validate)
   where
 
 import Control.Applicative
@@ -267,3 +268,26 @@ wrap :: (forall m. Monad m => StateT t m (Description d) -> StateT s m (Descript
 wrap redescribe reparse (Consumer d p) =
   Consumer (redescribe d)
            (reparse d p)
+
+-- | Add validation to a consumer.
+validate :: d                                              -- ^ Description of what it expects.
+         -> (forall m. MonadState s m => a -> m (Maybe b)) -- ^ Attempt to parse the value.
+         -> Consumer s d a                                 -- ^ Consumer to add validation to.
+         -> Consumer s d b                                 -- ^ A new validating consumer.
+validate d' check =
+  wrap (liftM wrapper)
+       (\d p ->
+          do s <- get
+             r <- p
+             case r of
+               (Failed e) -> return (Failed e)
+               (Continued e) ->
+                 return (Continued (wrapper e))
+               (Succeeded a) ->
+                 do r' <- check a
+                    case r' of
+                      Nothing ->
+                        do doc <- withStateT (const s) d
+                           return (Continued (wrapper doc))
+                      Just a' -> return (Succeeded a'))
+  where wrapper = Wrap d'
