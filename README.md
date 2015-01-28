@@ -113,6 +113,16 @@ wrap :: (forall m. Monad m => StateT t m (Description d)
      -> Consumer s d b
 ```
 
+There is also a handy function written in terms of `wrap` which will
+validate a consumer.
+
+``` haskell
+validate :: d                                              -- ^ Description of what it expects.
+         -> (forall m. MonadState s m => a -> m (Maybe b)) -- ^ Attempt to parse the value.
+         -> Consumer s d a                                 -- ^ Consumer to add validation to.
+         -> Consumer s d b                                 -- ^ A new validating consumer.
+```
+
 See below for some examples of this library.
 
 ## Parsing characters
