@@ -14,8 +14,6 @@ through a common interface: self-describing parsers:
 * A MUD command set is a self-describing parser.
 * A JSON API can be a self-describing parser.
 
-# Types
-
 Consumption is done in this data type:
 
 ``` haskell
