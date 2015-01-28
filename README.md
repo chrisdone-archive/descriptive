@@ -14,11 +14,15 @@ through a common interface: self-describing parsers:
 * A MUD command set is a self-describing parser.
 * A JSON API can be a self-describing parser.
 
+# Types
+
 Consumption is done in this data type:
 
 ``` haskell
 data Consumer s d a
 ```
+
+## Making descriptive consumers
 
 To make a consumer, this combinator is used:
 
@@ -36,6 +40,8 @@ state is determined by whatever use-case you have. The second argument
 parses from the state, which could be a stream of bytes, a list of
 strings, a Map, a Vector, etc. You may or may not decide to modify the
 state during generation of the description and during parsing.
+
+## Running descriptive consumers
 
 To use a consumer or describe what it does, these are used:
 
@@ -62,6 +68,8 @@ runDescription :: Monad m
 runDescription (Consumer desc _) = desc
 ```
 
+## Descriptions
+
 A description is like this:
 
 ``` haskell
@@ -86,6 +94,8 @@ describeParser :: Description Text -> Text
 describeForm :: Description (Html ()) -> Html ()
 describeArgs :: Description CmdArgs -> Text
 ```
+
+## Wrapping
 
 One can wrap up a consumer to alter either the description or the
 parser or both, this can be used for wrapping labels, or adding
