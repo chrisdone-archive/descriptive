@@ -31,7 +31,7 @@ data FormletState =
   deriving (Show,Eq)
 
 -- | Consume any character.
-indexed :: Consumer FormletState Formlet Text
+indexed :: Monad m => Consumer FormletState Formlet m Text
 indexed =
   consumer (do i <- nextIndex
                return (d i))

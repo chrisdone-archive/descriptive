@@ -46,9 +46,10 @@ data Option a
 
 -- | If the consumer succeeds, stops the whole parser and returns
 -- 'Stopped' immediately.
-stop :: Consumer [Text] (Option a) a
+stop :: Monad m
+     => Consumer [Text] (Option a) m a
      -- ^ A parser which, when it succeeds, causes the whole parser to stop.
-     -> Consumer [Text] (Option a) ()
+     -> Consumer [Text] (Option a) m ()
 stop =
   wrap (liftM (Wrap Stops))
        (\d p ->
@@ -66,8 +67,9 @@ stop =
 
 -- | Consume one argument from the argument list and pops it from the
 -- start of the list.
-anyString :: Text -- Help for the string.
-          -> Consumer [Text] (Option a) Text
+anyString :: Monad m
+          => Text -- Help for the string.
+          -> Consumer [Text] (Option a) m Text
 anyString help =
   consumer (return d)
            (do s <- get
@@ -79,10 +81,11 @@ anyString help =
 
 -- | Consume one argument from the argument list which must match the
 -- given string, and also pops it off the argument list.
-constant :: Text -- ^ String.
+constant :: Monad m
+         => Text -- ^ String.
          -> Text -- ^ Description.
          -> v
-         -> Consumer [Text] (Option a) v
+         -> Consumer [Text] (Option a) m v
 constant x' desc v =
   consumer (return d)
            (do s <- get
@@ -95,10 +98,11 @@ constant x' desc v =
 
 -- | Find a value flag which must succeed. Removes it from the
 -- argument list if it succeeds.
-flag :: Text -- ^ Name.
+flag :: Monad m
+     => Text -- ^ Name.
      -> Text -- ^ Description.
      -> v    -- ^ Value returned when present.
-     -> Consumer [Text] (Option a) v
+     -> Consumer [Text] (Option a) m v
 flag name help v =
   consumer (return d)
            (do s <- get
@@ -110,18 +114,20 @@ flag name help v =
 
 -- | Find a boolean flag. Always succeeds. Omission counts as
 -- 'False'. Removes it from the argument list if it returns True.
-switch :: Text -- ^ Name.
+switch :: Monad m
+       => Text -- ^ Name.
        -> Text -- ^ Description.
-       -> Consumer [Text] (Option a) Bool
+       -> Consumer [Text] (Option a) m Bool
 switch name help =
   flag name help True <|>
   pure False
 
 -- | Find an argument prefixed by -X. Removes it from the argument
 -- list when it succeeds.
-prefix :: Text -- ^ Prefix string.
+prefix :: Monad m
+       => Text -- ^ Prefix string.
        -> Text -- ^ Description.
-       -> Consumer [Text] (Option a) Text
+       -> Consumer [Text] (Option a) m Text
 prefix pref help =
   consumer (return d)
            (do s <- get
@@ -133,9 +139,10 @@ prefix pref help =
 
 -- | Find a named argument e.g. @--name value@. Removes it from the
 -- argument list when it succeeds.
-arg :: Text -- ^ Name.
+arg :: Monad m
+    => Text -- ^ Name.
     -> Text -- ^ Description.
-    -> Consumer [Text] (Option a) Text
+    -> Consumer [Text] (Option a) m Text
 arg name help =
   consumer (return d)
            (do s <- get

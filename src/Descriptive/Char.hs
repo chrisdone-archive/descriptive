@@ -14,7 +14,7 @@ import           Data.Text (Text)
 import qualified Data.Text as T
 
 -- | Consume any character.
-anyChar :: Consumer [Char] Text Char
+anyChar :: Monad m => Consumer [Char] Text m Char
 anyChar =
   consumer (return d)
            (do s <- get
@@ -25,7 +25,7 @@ anyChar =
   where d = Unit "a character"
 
 -- | A character consumer.
-char :: Char -> Consumer [Char] Text Char
+char :: Monad m => Char -> Consumer [Char] Text m Char
 char c =
   wrap (liftM (const d))
        (\_ p ->
@@ -41,7 +41,7 @@ char c =
   where d = Unit (T.singleton c)
 
 -- | A string consumer.
-string :: [Char] -> Consumer [Char] Text [Char]
+string :: Monad m => [Char] -> Consumer [Char] Text m [Char]
 string =
   wrap (liftM (Sequence . flattenAnds))
        (\_ p -> p) .

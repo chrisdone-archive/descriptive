@@ -62,9 +62,10 @@ data Doc
   deriving (Eq,Show,Typeable,Data)
 
 -- | Consume an object.
-object :: Text -- ^ Description of what the object is.
-       -> Consumer Object Doc a -- ^ An object consumer.
-       -> Consumer Value Doc a
+object :: Monad m
+       => Text -- ^ Description of what the object is.
+       -> Consumer Object Doc m a -- ^ An object consumer.
+       -> Consumer Value Doc m a
 object desc =
   wrap (\d ->
           do s <- get
@@ -92,9 +93,10 @@ object desc =
   where doc = Object desc
 
 -- | Consume from object at the given key.
-key :: Text -- ^ The key to lookup.
-    -> Consumer Value Doc a -- ^ A value consumer of the object at the key.
-    -> Consumer Object Doc a
+key :: Monad m
+    => Text -- ^ The key to lookup.
+    -> Consumer Value Doc m a -- ^ A value consumer of the object at the key.
+    -> Consumer Object Doc m a
 key k =
   wrap (\d ->
           do s <- get
@@ -117,9 +119,10 @@ key k =
 
 -- | Optionally consume from object at the given key, only if it
 -- exists.
-keyMaybe :: Text -- ^ The key to lookup.
-         -> Consumer Value Doc a -- ^ A value consumer of the object at the key.
-         -> Consumer Object Doc (Maybe a)
+keyMaybe :: Monad m
+         => Text -- ^ The key to lookup.
+         -> Consumer Value Doc m a -- ^ A value consumer of the object at the key.
+         -> Consumer Object Doc m (Maybe a)
 keyMaybe k =
   wrap (\d ->
           do s <- get
@@ -141,9 +144,10 @@ keyMaybe k =
   where doc = Key k
 
 -- | Consume an array.
-array :: Text -- ^ Description of this array.
-      -> Consumer Value Doc a -- ^ Consumer for each element in the array.
-      -> Consumer Value Doc (Vector a)
+array :: Monad m
+      => Text -- ^ Description of this array.
+      -> Consumer Value Doc m a -- ^ Consumer for each element in the array.
+      -> Consumer Value Doc m (Vector a)
 array desc =
   wrap (\d -> liftM (Wrap doc) d)
        (\_ p ->
@@ -172,8 +176,9 @@ array desc =
   where doc = Array desc
 
 -- | Consume a string.
-string :: Text -- ^ Description of what the string is for.
-       -> Consumer Value Doc Text
+string :: Monad m
+       => Text -- ^ Description of what the string is for.
+       -> Consumer Value Doc m Text
 string doc =
   consumer (return d)
            (do s <- get
@@ -184,8 +189,9 @@ string doc =
   where d = Unit (Text doc)
 
 -- | Consume an integer.
-integer :: Text -- ^ Description of what the integer is for.
-        -> Consumer Value Doc Integer
+integer :: Monad m
+        => Text -- ^ Description of what the integer is for.
+        -> Consumer Value Doc m Integer
 integer doc =
   consumer (return d)
            (do s <- get
@@ -197,8 +203,9 @@ integer doc =
   where d = Unit (Integer doc)
 
 -- | Consume an double.
-double :: Text -- ^ Description of what the double is for.
-       -> Consumer Value Doc Double
+double :: Monad m
+       => Text -- ^ Description of what the double is for.
+       -> Consumer Value Doc m Double
 double doc =
   consumer (return d)
            (do s <- get
@@ -209,8 +216,9 @@ double doc =
   where d = Unit (Double doc)
 
 -- | Parse a boolean.
-bool :: Text -- ^ Description of what the bool is for.
-     -> Consumer Value Doc Bool
+bool :: Monad m
+     => Text -- ^ Description of what the bool is for.
+     -> Consumer Value Doc m Bool
 bool doc =
   consumer (return d)
            (do s <- get
@@ -221,8 +229,9 @@ bool doc =
   where d = Unit (Boolean doc)
 
 -- | Expect null.
-null :: Text -- ^ What the null is for.
-       -> Consumer Value Doc ()
+null :: Monad m
+     => Text -- ^ What the null is for.
+     -> Consumer Value Doc m ()
 null doc =
   consumer (return d)
            (do s <- get
@@ -233,9 +242,10 @@ null doc =
   where d = Unit (Null doc)
 
 -- | Wrap a consumer with a label e.g. a type tag.
-label :: Text             -- ^ Some label.
-      -> Consumer s Doc a -- ^ A value consumer.
-      -> Consumer s Doc a
+label :: Monad m
+      => Text               -- ^ Some label.
+      -> Consumer s Doc m a -- ^ A value consumer.
+      -> Consumer s Doc m a
 label desc =
   wrap (liftM (Wrap doc))
        (\_ p ->
@@ -247,9 +257,10 @@ label desc =
   where doc = Label desc
 
 -- | Wrap a consumer with some handy information.
-info :: Text             -- ^ Some information.
-     -> Consumer s Doc a -- ^ A value consumer.
-     -> Consumer s Doc a
+info :: Monad m
+     => Text               -- ^ Some information.
+     -> Consumer s Doc m a -- ^ A value consumer.
+     -> Consumer s Doc m a
 info desc =
   wrap (liftM (Wrap doc))
        (\_ p ->

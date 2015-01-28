@@ -27,6 +27,7 @@ module Descriptive
 
 import Control.Applicative
 import Control.Monad.State.Strict
+import Control.Monad.Identity
 import Data.Bifunctor
 import Data.Monoid
 
@@ -34,13 +35,13 @@ import Data.Monoid
 -- Running
 
 -- | Run a consumer.
-consume :: Consumer s d a -- ^ The consumer to run.
+consume :: Consumer s d Identity a -- ^ The consumer to run.
         -> s -- ^ Initial state.
         -> Result (Description d) a
 consume c s = evalState (runConsumer c) s
 
 -- | Describe a consumer.
-describe :: Consumer s d a -- ^ The consumer to run.
+describe :: Consumer s d Identity a -- ^ The consumer to run.
          -> s -- ^ Initial state. Can be \"empty\" if you don't use it for
               -- generating descriptions.
          -> Description d -- ^ A description and resultant state.
@@ -48,13 +49,13 @@ describe c s = evalState (runDescription c) s
 
 -- | Run a consumer.
 runConsumer :: Monad m
-            => Consumer s d a -- ^ The consumer to run.
+            => Consumer s d m a -- ^ The consumer to run.
             -> StateT s m (Result (Description d) a)
 runConsumer (Consumer _ m) = m
 
 -- | Describe a consumer.
 runDescription :: Monad m
-               => Consumer s d a -- ^ The consumer to run.
+               => Consumer s d m a -- ^ The consumer to run.
                -> StateT s m (Description d) -- ^ A description and resultant state.
 runDescription (Consumer desc _) = desc
 
@@ -83,9 +84,9 @@ data Bound
   deriving (Show,Eq)
 
 -- | A consumer.
-data Consumer s d a =
-  Consumer {consumerDesc :: forall m. Monad m => StateT s m (Description d)
-           ,consumerParse :: forall m. Monad m => StateT s m (Result (Description d) a)}
+data Consumer s d m a =
+  Consumer {consumerDesc :: StateT s m (Description d)
+           ,consumerParse :: StateT s m (Result (Description d) a)}
 
 -- | Some result.
 data Result e a
@@ -106,7 +107,7 @@ instance Bifunctor Result where
       Failed e -> Failed (f e)
       Continued e -> Continued (f e)
 
-instance Functor (Consumer s d) where
+instance Monad m => Functor (Consumer s d m) where
   fmap f (Consumer d p) =
     Consumer d
              (do r <- p
@@ -118,7 +119,7 @@ instance Functor (Consumer s d) where
                    (Succeeded a) ->
                      return (Succeeded (f a)))
 
-instance Applicative (Consumer s d) where
+instance Monad m => Applicative (Consumer s d m) where
   pure a =
     consumer (return mempty)
              (return (Succeeded a))
@@ -150,7 +151,7 @@ instance Applicative (Consumer s d) where
                        Succeeded a ->
                          return (Succeeded (f a)))
 
-instance Alternative (Consumer s d) where
+instance Monad m => Alternative (Consumer s d m) where
   empty =
     consumer (return mempty)
              (return (Failed mempty))
@@ -186,7 +187,7 @@ instance Alternative (Consumer s d) where
 
 -- | An internal sequence maker which describes itself better than
 -- regular Alternative, and is strict, not lazy.
-sequenceHelper :: Integer -> Consumer t d a -> Consumer t d [a]
+sequenceHelper :: Monad m => Integer -> Consumer t d m a -> Consumer t d m [a]
 sequenceHelper minb =
   wrap (liftM redescribe)
        (\_ p ->
@@ -238,7 +239,7 @@ instance (Monoid a) => Monoid (Result (Description d) a) where
           Continued e -> Continued e
           Succeeded b -> Succeeded (a <> b)
 
-instance (Monoid a) => Monoid (Consumer s d a) where
+instance (Monoid a, Monad m) => Monoid (Consumer s d m a) where
   mempty =
     consumer (return mempty)
              (return mempty)
@@ -248,32 +249,33 @@ instance (Monoid a) => Monoid (Consumer s d a) where
 -- Combinators
 
 -- | Make a self-describing consumer.
-consumer :: (forall m. Monad m => StateT s m (Description d))
+consumer :: (StateT s m (Description d))
          -- ^ Produce description based on the state.
-         -> (forall m. Monad m => StateT s m (Result (Description d) a))
+         -> (StateT s m (Result (Description d) a))
          -- ^ Parse the state and maybe transform it if desired.
-         -> Consumer s d a
+         -> Consumer s d m a
 consumer d p =
   Consumer d p
 
 -- | Wrap a consumer with another consumer. The type looks more
 -- intimidating than it actually is. The source code is trivial. It
 -- simply allows for a way to transform the type of the state.
-wrap :: (forall m. Monad m => StateT t m (Description d) -> StateT s m (Description d))
+wrap :: (StateT t m (Description d) -> StateT s m (Description d))
      -- ^ Transform the description.
-     -> (forall m. Monad m => StateT t m (Description d) -> StateT t m (Result (Description d) a) -> StateT s m (Result (Description d) b))
+     -> (StateT t m (Description d) -> StateT t m (Result (Description d) a) -> StateT s m (Result (Description d) b))
      -- ^ Transform the parser. Can re-run the parser as many times as desired.
-     -> Consumer t d a
-     -> Consumer s d b
+     -> Consumer t d m a
+     -> Consumer s d m b
 wrap redescribe reparse (Consumer d p) =
   Consumer (redescribe d)
            (reparse d p)
 
 -- | Add validation to a consumer.
-validate :: d                                              -- ^ Description of what it expects.
-         -> (forall m. MonadState s m => a -> m (Maybe b)) -- ^ Attempt to parse the value.
-         -> Consumer s d a                                 -- ^ Consumer to add validation to.
-         -> Consumer s d b                                 -- ^ A new validating consumer.
+validate :: Monad m 
+         => d                           -- ^ Description of what it expects.
+         -> (a -> StateT s m (Maybe b)) -- ^ Attempt to parse the value.
+         -> Consumer s d m a            -- ^ Consumer to add validation to.
+         -> Consumer s d m b            -- ^ A new validating consumer.
 validate d' check =
   wrap (liftM wrapper)
        (\d p ->

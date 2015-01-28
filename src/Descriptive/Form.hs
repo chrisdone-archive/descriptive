@@ -26,7 +26,7 @@ data Form
   deriving (Show,Eq)
 
 -- | Consume any input value.
-input :: Text -> Consumer (Map Text Text) Form Text
+input :: Monad m => Text -> Consumer (Map Text Text) Form m Text
 input name =
   consumer (return d)
            (do s <- get
