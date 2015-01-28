@@ -164,7 +164,7 @@ data Submission =
              ,submissionSubreddit :: !Integer}
   deriving (Show,Eq)
 
-submission :: Consumer Value JSON.Doc Submission
+submission :: Monad m => Consumer Value JSON.Doc m Submission
 submission =
   JSON.object "Submission"
               (Submission
