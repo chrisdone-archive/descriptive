@@ -47,6 +47,7 @@ To use a consumer or describe what it does, these are used:
 consume :: Consumer s d a -- ^ The consumer to run.
         -> s -- ^ Initial state.
         -> Result (Description d) a
+
 describe :: Consumer s d a -- ^ The consumer to run.
          -> s -- ^ Initial state. Can be \"empty\" if you don't use it for
               -- generating descriptions.
@@ -60,6 +61,7 @@ runConsumer :: Monad m
             => Consumer s d a -- ^ The consumer to run.
             -> StateT s m (Result (Description d) a)
 runConsumer (Consumer _ m) = m
+
 runDescription :: Monad m
                => Consumer s d a -- ^ The consumer to run.
                -> StateT s m (Description d)
