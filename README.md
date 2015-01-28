@@ -3,7 +3,7 @@ descriptive
 
 Self-describing consumers/parsers
 
-[Haddocks](http://chrisdone.com/descriptive/)
+[Documentation](http://chrisdone.github.io/descriptive/)
 
 There are a variety of Haskell libraries which are implementable
 through a common interface: self-describing parsers:
