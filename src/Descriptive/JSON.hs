@@ -23,7 +23,6 @@ module Descriptive.JSON
   ,null
   -- * Annotations
   ,label
-  ,info
   -- * Description
   ,Doc(..)
   )
@@ -48,7 +47,7 @@ import qualified Data.Vector as V
 import           Prelude hiding (null)
 
 -- | Description of parseable things.
-data Doc
+data Doc a
   = Integer !Text
   | Double !Text
   | Text !Text
@@ -57,15 +56,14 @@ data Doc
   | Object !Text
   | Key !Text
   | Array !Text
-  | Label !Text
-  | Info !Text
+  | Label !a
   deriving (Eq,Show,Typeable,Data)
 
 -- | Consume an object.
 object :: Monad m
        => Text -- ^ Description of what the object is.
-       -> Consumer Object Doc m a -- ^ An object consumer.
-       -> Consumer Value Doc m a
+       -> Consumer Object (Doc d) m a -- ^ An object consumer.
+       -> Consumer Value (Doc d) m a
 object desc =
   wrap (\d ->
           do s <- get
@@ -76,7 +74,7 @@ object desc =
           do v <- get
              case fromJSON v of
                Error{} ->
-                 return (Failed (Unit doc))
+                 return (Continued (Unit doc))
                Success (o :: Object) ->
                  do s <- get
                     runSubStateT
@@ -85,7 +83,7 @@ object desc =
                       (do r <- p
                           case r of
                             Failed e ->
-                              return (Failed (Wrap doc e))
+                              return (Continued (Wrap doc e))
                             Continued e ->
                               return (Continued (Wrap doc e))
                             Succeeded a ->
@@ -95,8 +93,8 @@ object desc =
 -- | Consume from object at the given key.
 key :: Monad m
     => Text -- ^ The key to lookup.
-    -> Consumer Value Doc m a -- ^ A value consumer of the object at the key.
-    -> Consumer Object Doc m a
+    -> Consumer Value (Doc d) m a -- ^ A value consumer of the object at the key.
+    -> Consumer Object (Doc d) m a
 key k =
   wrap (\d ->
           do s <- get
@@ -108,7 +106,7 @@ key k =
              case parseMaybe (const (s .: k))
                              () of
                Nothing ->
-                 return (Failed (Unit doc))
+                 return (Continued (Unit doc))
                Just (v :: Value) ->
                  do r <-
                       runSubStateT (const v)
@@ -121,8 +119,8 @@ key k =
 -- exists.
 keyMaybe :: Monad m
          => Text -- ^ The key to lookup.
-         -> Consumer Value Doc m a -- ^ A value consumer of the object at the key.
-         -> Consumer Object Doc m (Maybe a)
+         -> Consumer Value (Doc d) m a -- ^ A value consumer of the object at the key.
+         -> Consumer Object (Doc d) m (Maybe a)
 keyMaybe k =
   wrap (\d ->
           do s <- get
@@ -146,15 +144,15 @@ keyMaybe k =
 -- | Consume an array.
 array :: Monad m
       => Text -- ^ Description of this array.
-      -> Consumer Value Doc m a -- ^ Consumer for each element in the array.
-      -> Consumer Value Doc m (Vector a)
+      -> Consumer Value (Doc d) m a -- ^ Consumer for each element in the array.
+      -> Consumer Value (Doc d) m (Vector a)
 array desc =
   wrap (\d -> liftM (Wrap doc) d)
        (\_ p ->
           do s <- get
              case fromJSON s of
                Error{} ->
-                 return (Failed (Unit doc))
+                 return (Continued (Unit doc))
                Success (o :: Vector Value) ->
                  fix (\loop i acc ->
                         if i < V.length o - 1
@@ -164,9 +162,9 @@ array desc =
                                                   p
                                    case r of
                                      Failed e ->
-                                       return (Failed (Wrap doc e))
+                                       return (Continued (Wrap doc e))
                                      Continued e ->
-                                       return (Failed (Wrap doc e))
+                                       return (Continued (Wrap doc e))
                                      Succeeded a ->
                                        loop (i + 1)
                                             (a : acc)
@@ -178,12 +176,12 @@ array desc =
 -- | Consume a string.
 string :: Monad m
        => Text -- ^ Description of what the string is for.
-       -> Consumer Value Doc m Text
+       -> Consumer Value (Doc d) m Text
 string doc =
   consumer (return d)
            (do s <- get
                case fromJSON s of
-                 Error{} -> return (Failed d)
+                 Error{} -> return (Continued d)
                  Success a ->
                    return (Succeeded a))
   where d = Unit (Text doc)
@@ -191,7 +189,7 @@ string doc =
 -- | Consume an integer.
 integer :: Monad m
         => Text -- ^ Description of what the integer is for.
-        -> Consumer Value Doc m Integer
+        -> Consumer Value (Doc d) m Integer
 integer doc =
   consumer (return d)
            (do s <- get
@@ -199,31 +197,31 @@ integer doc =
                  Number a
                    | Right i <- floatingOrInteger a ->
                      return (Succeeded i)
-                 _ -> return (Failed d))
+                 _ -> return (Continued d))
   where d = Unit (Integer doc)
 
 -- | Consume an double.
 double :: Monad m
        => Text -- ^ Description of what the double is for.
-       -> Consumer Value Doc m Double
+       -> Consumer Value (Doc d) m Double
 double doc =
   consumer (return d)
            (do s <- get
                case s of
                  Number a ->
                    return (Succeeded (toRealFloat a))
-                 _ -> return (Failed d))
+                 _ -> return (Continued d))
   where d = Unit (Double doc)
 
 -- | Parse a boolean.
 bool :: Monad m
      => Text -- ^ Description of what the bool is for.
-     -> Consumer Value Doc m Bool
+     -> Consumer Value (Doc d) m Bool
 bool doc =
   consumer (return d)
            (do s <- get
                case fromJSON s of
-                 Error{} -> return (Failed d)
+                 Error{} -> return (Continued d)
                  Success a ->
                    return (Succeeded a))
   where d = Unit (Boolean doc)
@@ -231,42 +229,27 @@ bool doc =
 -- | Expect null.
 null :: Monad m
      => Text -- ^ What the null is for.
-     -> Consumer Value Doc m ()
+     -> Consumer Value (Doc d) m ()
 null doc =
   consumer (return d)
            (do s <- get
                case fromJSON s of
                  Success Aeson.Null ->
                    return (Succeeded ())
-                 _ -> return (Failed d))
+                 _ -> return (Continued d))
   where d = Unit (Null doc)
 
 -- | Wrap a consumer with a label e.g. a type tag.
 label :: Monad m
-      => Text               -- ^ Some label.
-      -> Consumer s Doc m a -- ^ A value consumer.
-      -> Consumer s Doc m a
+      => d                      -- ^ Some label.
+      -> Consumer s (Doc d) m a -- ^ A value consumer.
+      -> Consumer s (Doc d) m a
 label desc =
   wrap (liftM (Wrap doc))
        (\_ p ->
           do r <- p
              case r of
                Failed e ->
-                 return (Failed (Wrap doc e))
+                 return (Continued (Wrap doc e))
                k -> return k)
   where doc = Label desc
-
--- | Wrap a consumer with some handy information.
-info :: Monad m
-     => Text               -- ^ Some information.
-     -> Consumer s Doc m a -- ^ A value consumer.
-     -> Consumer s Doc m a
-info desc =
-  wrap (liftM (Wrap doc))
-       (\_ p ->
-          do r <- p
-             case r of
-               Failed e ->
-                 return (Failed (Wrap doc e))
-               k -> return k)
-  where doc = Info desc

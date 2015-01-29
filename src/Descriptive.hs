@@ -271,7 +271,7 @@ wrap redescribe reparse (Consumer d p) =
            (reparse d p)
 
 -- | Add validation to a consumer.
-validate :: Monad m 
+validate :: Monad m
          => d                           -- ^ Description of what it expects.
          -> (a -> StateT s m (Maybe b)) -- ^ Attempt to parse the value.
          -> Consumer s d m a            -- ^ Consumer to add validation to.
