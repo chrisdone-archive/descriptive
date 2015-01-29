@@ -164,7 +164,7 @@ data Submission =
              ,submissionSubreddit :: !Integer}
   deriving (Show,Eq)
 
-submission :: Monad m => Consumer Value JSON.Doc m Submission
+submission :: Monad m => Consumer Value (JSON.Doc Text) m Submission
 submission =
   JSON.object "Submission"
               (Submission
@@ -210,6 +210,6 @@ json =
                                ,submissionSubreddit = 234214}))
      it "failing json"
         (consume submission badsample ==
-         Failed (Wrap (JSON.Object "Submission")
-                      (Wrap (JSON.Key "comment")
-                            (Unit (JSON.Text "Submission comment")))))
+         Continued (Wrap (JSON.Object "Submission")
+                         (Wrap (JSON.Key "comment")
+                               (Unit (JSON.Text "Submission comment")))))
