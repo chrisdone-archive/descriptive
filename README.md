@@ -267,15 +267,15 @@ badsample =
 
 ``` haskell
 λ> describe submission (toJSON ())
-Wrap (Struct "Submission")
-      (And (And (And (Wrap (Key "token")
-                           (Unit (Integer "Submission token; see the API docs")))
-                     (Wrap (Key "title")
-                           (Unit (Text "Submission title"))))
-                (Wrap (Key "comment")
-                      (Unit (Text "Submission comment"))))
-           (Wrap (Key "subreddit")
-                 (Unit (Integer "The ID of the subreddit"))))
+Wrap (Object "Submission")
+     (And (And (And (Wrap (Key "token")
+                          (Unit (Integer "Submission token; see the API docs")))
+                    (Wrap (Key "title")
+                          (Unit (Text "Submission title"))))
+               (Wrap (Key "comment")
+                     (Unit (Text "Submission comment"))))
+          (Wrap (Key "subreddit")
+                (Unit (Integer "The ID of the subreddit"))))
 
 
 λ> consume submission sample
@@ -284,9 +284,9 @@ Succeeded (Submission {submissionToken = 123
                    ,submissionComment = "This is good"
                    ,submissionSubreddit = 234214})
 λ> consume submission badsample
-Failed (Wrap (Struct "Submission")
-            (Wrap (Key "comment")
-                  (Unit (Text "Submission comment"))))
+Failed (Wrap (Object "Submission")
+             (Wrap (Key "comment")
+                   (Unit (Text "Submission comment"))))
 ```
 
 The bad sample yields an informative message that:
