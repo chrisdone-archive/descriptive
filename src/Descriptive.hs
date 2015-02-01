@@ -168,7 +168,7 @@ instance Monad m => Alternative (Consumer s d m) where
                           Failed e2 ->
                             return (Failed e2)
                           Continued e2 ->
-                            return (Continued (e1 <> e2))
+                            return (Continued (Or e1 e2))
                           Succeeded a' ->
                             return (Succeeded a')
                    Failed e1 ->
