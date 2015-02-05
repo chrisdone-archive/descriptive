@@ -1,3 +1,6 @@
+0.9.0:
+	* Move 'validate' to .JSON as 'parse'.
+
 0.5.0:
 	* Changed the parser/doc type to use StateT m. So now you can use
 	monads as part of your consumers.

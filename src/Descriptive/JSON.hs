@@ -12,7 +12,8 @@
 
 module Descriptive.JSON
   (-- * Consumers
-   object
+   parse
+  ,object
   ,key
   ,keyMaybe
   ,array
@@ -155,7 +156,7 @@ array desc =
                  return (Continued (Unit doc))
                Success (o :: Vector Value) ->
                  fix (\loop i acc ->
-                        if i < V.length o - 1
+                        if i < V.length o
                            then do r <-
                                      runSubStateT (const (o ! i))
                                                   (const s)
@@ -250,6 +251,32 @@ label desc =
           do r <- p
              case r of
                Failed e ->
+                 return (Failed (Wrap doc e))
+               Continued e ->
                  return (Continued (Wrap doc e))
                k -> return k)
   where doc = Label desc
+
+-- | Parse from a consumer.
+parse :: Monad m
+      => d                           -- ^ Description of what it expects.
+      -> (a -> StateT s m (Maybe b)) -- ^ Attempt to parse the value.
+      -> Consumer s d m a            -- ^ Consumer to add validation to.
+      -> Consumer s d m b            -- ^ A new validating consumer.
+parse d' check =
+  wrap (liftM wrapper)
+       (\d p ->
+          do s <- get
+             r <- p
+             case r of
+               (Failed e) -> return (Failed e)
+               (Continued e) ->
+                 return (Continued (wrapper e))
+               (Succeeded a) ->
+                 do r' <- check a
+                    case r' of
+                      Nothing ->
+                        do doc <- withStateT (const s) d
+                           return (Continued (wrapper doc))
+                      Just a' -> return (Succeeded a'))
+  where wrapper = Wrap d'
