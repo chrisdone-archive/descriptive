@@ -205,7 +205,6 @@ server =
    anyString "SERVER_NAME" <*>
    switch "dev" "Enable dev mode?" <*>
    arg "port" "Port to listen on")
-   ((,,,) <$>
 ```
 
 ``` haskell

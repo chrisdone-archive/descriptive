@@ -1,6 +1,8 @@
+{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE KindSignatures #-}
+{-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -25,8 +27,9 @@ module Descriptive
   where
 
 import Control.Applicative
-import Control.Monad.State.Strict
+import Control.Applicative.QQ.Idiom
 import Control.Monad.Identity
+import Control.Monad.State.Strict
 import Data.Bifunctor
 import Data.Monoid
 
@@ -70,11 +73,13 @@ data Description a
   | Sequence ![Description a]
   | Wrap a !(Description a)
   | None
-  deriving (Show,Eq)
+  deriving (Show,Eq,Functor)
 
 instance Monoid (Description d) where
   mempty = None
-  mappend = And
+  mappend None x = x
+  mappend x None = x
+  mappend x y = And x y
 
 -- | The bounds of a many-consumable thing.
 data Bound
@@ -157,7 +162,7 @@ instance Monad m => Alternative (Consumer s d m) where
   Consumer d p <|> Consumer d' p' =
     consumer (do d1 <- d
                  d2 <- d'
-                 return (Or d1 d2))
+                 return (disjunct d1 d2))
              (do s <- get
                  r <- p
                  case r of
@@ -167,7 +172,7 @@ instance Monad m => Alternative (Consumer s d m) where
                           Failed e2 ->
                             return (Failed e2)
                           Continued e2 ->
-                            return (Continued (Or e1 e2))
+                            return (Continued (disjunct e1 e2))
                           Succeeded a' ->
                             return (Succeeded a')
                    Failed e1 ->
@@ -175,12 +180,15 @@ instance Monad m => Alternative (Consumer s d m) where
                         r' <- p'
                         case r' of
                           Failed e2 ->
-                            return (Failed (Or e1 e2))
+                            return (Failed (disjunct e1 e2))
                           Continued e2 ->
                             return (Continued e2)
                           Succeeded a2 ->
                             return (Succeeded a2)
                    Succeeded a1 -> return (Succeeded a1))
+    where disjunct None x = x
+          disjunct x None = x
+          disjunct x y = Or x y
   many = sequenceHelper 0
   some = sequenceHelper 1
 
@@ -242,7 +250,7 @@ instance (Monoid a, Monad m) => Monoid (Consumer s d m a) where
   mempty =
     consumer (return mempty)
              (return mempty)
-  mappend x y = (<>) <$> x <*> y
+  mappend x y = [i|(<>) x y|]
 
 --------------------------------------------------------------------------------
 -- Combinators
