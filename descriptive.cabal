@@ -33,7 +33,6 @@ library
                    , text
                    , transformers
                    , vector
-                   , applicative-quoters
 
 test-suite test
     type: exitcode-stdio-1.0

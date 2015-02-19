@@ -27,7 +27,6 @@ module Descriptive
   where
 
 import Control.Applicative
-import Control.Applicative.QQ.Idiom
 import Control.Monad.Identity
 import Control.Monad.State.Strict
 import Data.Bifunctor
@@ -250,7 +249,7 @@ instance (Monoid a, Monad m) => Monoid (Consumer s d m a) where
   mempty =
     consumer (return mempty)
              (return mempty)
-  mappend x y = [i|(<>) x y|]
+  mappend = liftA2 (<>)
 
 --------------------------------------------------------------------------------
 -- Combinators
