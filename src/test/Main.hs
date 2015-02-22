@@ -94,15 +94,15 @@ form =
                     [("password2","gob"),("password","go"),("token","woot")]) ==
          Succeeded "woot")
   where login =
-          validate
-            (Form.Constraint "confirmed password (entered the same twice)")
-            (\(x,y) ->
-               return (if x == y
-                          then Just y
-                          else Nothing))
-            ((,) <$>
-             Form.input "password" <*>
-             Form.input "password2") <|>
+          Form.validate
+                 "confirmed password (entered the same twice)"
+                 (\(x,y) ->
+                    return (if x == y
+                               then Just y
+                               else Nothing))
+                 ((,) <$>
+                  Form.input "password" <*>
+                  Form.input "password2") <|>
           Form.input "token"
 
 --------------------------------------------------------------------------------
