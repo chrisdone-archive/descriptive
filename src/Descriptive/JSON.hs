@@ -271,7 +271,7 @@ parse d' check =
              case r of
                (Failed e) -> return (Failed e)
                (Continued e) ->
-                 return (Continued (wrapper e))
+                 return (Continued e)
                (Succeeded a) ->
                  do r' <- check a
                     case r' of
