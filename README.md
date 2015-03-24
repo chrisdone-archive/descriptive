@@ -17,7 +17,7 @@ through a common interface: self-describing parsers:
 Consumption is done in this data type:
 
 ``` haskell
-data Consumer s d a
+data Consumer s d m a
 ```
 
 ### Making descriptive consumers
