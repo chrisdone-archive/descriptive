@@ -214,9 +214,9 @@ And (And (And (Unit (Constant "start"))
           (Unit (Flag "dev" "Enable dev mode?")))
      (Unit (Arg "port" "Port to listen on"))
 λ> consume server ["start","any","--port","1234","--dev"]
-Succeeded ("start","any",True,"1234")
+Succeeded ((),"any",True,"1234")
 λ> consume server ["start","any","--port","1234"]
-Succeeded ("start","any",False,"1234")
+Succeeded ((),"any",False,"1234")
 λ>
 ```
 
