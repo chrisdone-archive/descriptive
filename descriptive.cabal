@@ -24,12 +24,12 @@ library
                      Descriptive.Options
                      Descriptive.JSON
   other-modules:     Descriptive.Internal
-  build-depends:     aeson
-                   , base >= 4 && <5
+  build-depends:     aeson >= 0.7.0.5
+                   , base >= 4.4 && <5
                    , bifunctors
-                   , containers
+                   , containers >= 0.5
                    , mtl
-                   , scientific
+                   , scientific >= 0.3.2
                    , text
                    , transformers
                    , vector
