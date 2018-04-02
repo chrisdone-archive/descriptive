@@ -1,12 +1,15 @@
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE CPP #-}
 
 -- | Consuming form a list of characters.
 
 module Descriptive.Char where
 
+#if __GLASGOW_HASKELL__ < 802
 import           Data.Traversable
+#endif
 import           Descriptive
 
 import           Control.Monad.State.Strict

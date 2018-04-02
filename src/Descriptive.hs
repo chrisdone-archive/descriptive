@@ -6,6 +6,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE CPP #-}
 
 -- | Descriptive parsers.
 
@@ -30,7 +31,9 @@ import Control.Applicative
 import Control.Monad.Identity
 import Control.Monad.State.Strict
 import Data.Bifunctor
-import Data.Monoid
+#if __GLASGOW_HASKELL__ < 804
+import Data.Semigroup
+#endif
 
 --------------------------------------------------------------------------------
 -- Running
@@ -74,11 +77,14 @@ data Description a
   | None
   deriving (Show,Eq,Functor)
 
+instance Semigroup (Description d) where
+  (<>) None x = x
+  (<>) x None = x
+  (<>) x y = And x y
+
 instance Monoid (Description d) where
   mempty = None
-  mappend None x = x
-  mappend x None = x
-  mappend x y = And x y
+  mappend = (<>)
 
 -- | The bounds of a many-consumable thing.
 data Bound
@@ -229,9 +235,8 @@ sequenceHelper minb =
               [])
   where redescribe = Bounded minb UnlimitedBound
 
-instance (Monoid a) => Monoid (Result (Description d) a) where
-  mempty = Succeeded mempty
-  mappend x y =
+instance (Semigroup a) => Semigroup (Result (Description d) a) where
+  x <> y =
     case x of
       Failed e -> Failed e
       Continued e ->
@@ -245,11 +250,18 @@ instance (Monoid a) => Monoid (Result (Description d) a) where
           Continued e -> Continued e
           Succeeded b -> Succeeded (a <> b)
 
-instance (Monoid a, Monad m) => Monoid (Consumer s d m a) where
+instance (Semigroup a, Monoid a) => Monoid (Result (Description d) a) where
+  mempty = Succeeded mempty
+  mappend = (<>)
+
+instance (Semigroup a, Monad m) => Semigroup (Consumer s d m a) where
+  (<>) = liftA2 (<>)
+
+instance (Semigroup a, Monoid a, Monad m) => Monoid (Consumer s d m a) where
   mempty =
     consumer (return mempty)
              (return mempty)
-  mappend = liftA2 (<>)
+  mappend = (<>)
 
 --------------------------------------------------------------------------------
 -- Combinators
