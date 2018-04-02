@@ -1,6 +1,7 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE CPP #-}
 
 -- | Command-line options parser.
 
@@ -29,7 +30,9 @@ import           Control.Applicative
 import           Control.Monad.State.Strict
 import           Data.Char
 import           Data.List
+#if __GLASGOW_HASKELL__ < 804
 import           Data.Monoid
+#endif
 import           Data.Text (Text)
 import qualified Data.Text as T
 
