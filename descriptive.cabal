@@ -1,5 +1,5 @@
 name:                descriptive
-version:             0.9.4
+version:             0.9.5
 synopsis:            Self-describing consumers/parsers; forms, cmd-line args, JSON, etc.
 description:         Self-describing consumers/parsers. See the README.md for more information. It is currently EXPERIMENTAL.
 stability:           Experimental
